@@ -1,0 +1,20 @@
+{
+  "name": "personalized-attendance-tracking",
+  "version": "1.0.0",
+  "description": "AI Assisted Personalized Attendance Tracking and Alert System for Students",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mitalii1/PERSONALIZED-ATTENDANCE-TRACKING.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Mitalii1/PERSONALIZED-ATTENDANCE-TRACKING/issues"
+  },
+  "homepage": "https://github.com/Mitalii1/PERSONALIZED-ATTENDANCE-TRACKING#readme"
+}
