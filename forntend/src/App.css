@@ -36,3 +36,19 @@
     transform: rotate(360deg);
   }
 }
+
+@media screen and (max-width: 768px) {
+  
+}
+
+.dashboard {
+  color: white;
+  display : flex;
+  flex-direction : column;
+  flex-wrap: wrap;
+  align-items : flex-start;
+  margin-top : 1rem;
+  margin-left : 2rem;
+}
+
+
