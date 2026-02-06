@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/Mitalii1/PERSONALIZED-ATTENDANCE-TRACKING/issues"
   },
-  "homepage": "https://github.com/Mitalii1/PERSONALIZED-ATTENDANCE-TRACKING#readme"
+  "homepage": "https://github.com/Mitalii1/PERSONALIZED-ATTENDANCE-TRACKING#readme",
+  "dependencies": {
+    "bootstrap": "^5.3.8"
+  }
 }
