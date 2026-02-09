@@ -1,11 +1,16 @@
 import React from "react";
 
 const Dashboard = (props) => {
+
+    const handlesignin = (e) => {
+        e.preventDefault();
+        alert("Sign in successful!");   
+    }
   return (
     <div className="container">
       <h1>{props.title}</h1>
       <div>
-        <form className="row g-3">
+        <form className="row g-3" onSubmit={handlesignin}>
           <div className="col-md-6">
             <label htmlFor="inputEmail4" className="form-label">
               Email

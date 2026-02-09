@@ -38,28 +38,26 @@
 }
 
 @media screen and (max-width: 768px) {
-  
 }
 
 .container {
-  background-color: #77726F;
   color: white;
-  display : flex;
-  flex-direction : column;
-  gap : 5rem;
-  align-items : center;
-  margin-top : 10rem;
-  margin-left : 10rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5rem;
+  align-items: center;
+  margin-top: 10rem;
+  margin-left: 10rem;
   border-radius: 2rem;
 }
 
 .container h1 {
   margin: 2rem;
-  font-size : 3rem;
-  margin-bottom : 2rem;
+  font-size: 3rem;
+  margin-bottom: 2rem;
 }
 
-.col-md-4{
+.col-md-4 {
   margin-left: 33%;
   margin-top: 2rem;
 }
