@@ -37,27 +37,11 @@
   }
 }
 
-@media screen and (max-width: 768px) {
-}
-
-.container {
+.App h1 {
   color: white;
+  margin-top: 20px;
   display: flex;
-  flex-direction: column;
-  gap: 5rem;
-  align-items: center;
-  margin-top: 10rem;
-  margin-left: 10rem;
-  border-radius: 2rem;
-}
-
-.container h1 {
+  align-items: flex-start;
   margin: 2rem;
-  font-size: 3rem;
-  margin-bottom: 2rem;
-}
-
-.col-md-4 {
-  margin-left: 33%;
-  margin-top: 2rem;
+  font-size: 2rem;
 }

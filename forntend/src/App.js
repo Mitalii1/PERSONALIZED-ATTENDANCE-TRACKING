@@ -1,11 +1,12 @@
 import './App.css';
+import getstarted from './Components/Getstarted';
 import React from 'react';
-import Dashboard from './Components/dashboard';
 
 function App() {
   return (
     <div className="App">
-      <Dashboard title="PERSONALIZED ATTENDANCE TRACKING"/>
+      <h1>Personalized Attendance Tracking System</h1>
+      <getstarted />
     </div>
   );
 }
