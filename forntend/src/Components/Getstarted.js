@@ -150,9 +150,6 @@ function Getstarted() {
               <div className="pat-chip-value">84.3%</div>
               <div className="pat-chip-muted">Auto calculated</div>
             </div>
-
-            <div className="pat-orb pat-orb-1" />
-            <div className="pat-orb pat-orb-2" />
           </div>
 
           <div className="pat-left-footer">Minimal UI · Soft colors · Smooth transitions</div>
