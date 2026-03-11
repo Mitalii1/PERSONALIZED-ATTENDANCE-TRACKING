@@ -10,6 +10,7 @@ function Getstarted() {
     email: '',
     password: '',
     confirmPassword: '',
+    year: '',
     remember: false,
   });
 
@@ -18,6 +19,7 @@ function Getstarted() {
     email: '',
     password: '',
     confirmPassword: '',
+    year: '',
   });
 
   const [status, setStatus] = useState({ type: '', message: '' }); // type: 'success' | 'error' | ''
@@ -41,12 +43,12 @@ function Getstarted() {
   }
 
   function clearNonModeFields(nextMode) {
-    setErrors({ name: '', email: '', password: '', confirmPassword: '' });
+    setErrors({ name: '', email: '', password: '', confirmPassword: '', year: '' });
     setStatus({ type: '', message: '' });
     setSubmitting(false);
 
     if (nextMode === 'login') {
-      setValues((prev) => ({ ...prev, name: '', confirmPassword: '' }));
+      setValues((prev) => ({ ...prev, name: '', confirmPassword: '', year: '' }));
     }
   }
 
@@ -55,7 +57,7 @@ function Getstarted() {
   }
 
   function validate() {
-    const next = { name: '', email: '', password: '', confirmPassword: '' };
+    const next = { name: '', email: '', password: '', confirmPassword: '', year: '' };
     let ok = true;
 
     if (isRegister && values.name.trim().length < 2) {
@@ -74,6 +76,10 @@ function Getstarted() {
     }
 
     if (isRegister) {
+      if (!values.year) {
+        next.year = 'Please select your year.';
+        ok = false;
+      }
       if (!values.confirmPassword) {
         next.confirmPassword = 'Please confirm your password.';
         ok = false;
@@ -109,14 +115,56 @@ function Getstarted() {
     setSubmitting(true);
     setStatus({ type: '', message: '' });
 
-    // Demo-only fake submit (connect to backend later)
-    await new Promise((r) => setTimeout(r, 900));
+    try {
+      const endpoint = isRegister ? '/signup' : '/login';
+      const payload = isRegister
+        ? {
+            name: values.name,
+            email: values.email,
+            password: values.password,
+            year: values.year,
+          }
+        : {
+            email: values.email,
+            password: values.password,
+          };
 
-    setSubmitting(false);
-    setStatus({
-      type: 'success',
-      message: isRegister ? 'Account created! (demo only)' : 'Login successful! (demo only)',
-    });
+      const response = await fetch(`http://localhost:5000${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSubmitting(false);
+        setStatus({
+          type: 'success',
+          message: data.message || (isRegister ? 'Account created successfully!' : 'Login successful!'),
+        });
+        // Clear form on success
+        if (isRegister) {
+          setValues({ name: '', email: '', password: '', confirmPassword: '', year: '', remember: false });
+        } else {
+          setValues({ ...values, password: '' });
+        }
+      } else {
+        setSubmitting(false);
+        setStatus({
+          type: 'error',
+          message: data.message || 'Something went wrong. Please try again.',
+        });
+      }
+    } catch (error) {
+      setSubmitting(false);
+      setStatus({
+        type: 'error',
+        message: 'Connection error. Make sure the backend is running on http://localhost:5000',
+      });
+    }
   }
 
   return (
@@ -222,6 +270,32 @@ function Getstarted() {
                   </span>
                 </div>
                 <div className="pat-error">{errors.name}</div>
+              </div>
+            )}
+
+            {isRegister && (
+              <div className="pat-field">
+                <label className="pat-label" htmlFor="pat-year">
+                  Year
+                </label>
+                <div className={`pat-input-wrap ${errors.year ? 'has-error' : ''}`}>
+                  <select
+                    id="pat-year"
+                    value={values.year}
+                    onChange={(e) => setField('year', e.target.value)}
+                    className="pat-select"
+                  >
+                    <option value="">Select your year</option>
+                    <option value="1">First Year</option>
+                    <option value="2">Second Year</option>
+                    <option value="3">Third Year</option>
+                    <option value="4">Fourth Year</option>
+                  </select>
+                  <span className="pat-input-icon" aria-hidden="true">
+                    📚
+                  </span>
+                </div>
+                <div className="pat-error">{errors.year}</div>
               </div>
             )}
 
