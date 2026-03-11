@@ -375,7 +375,26 @@
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
 }
 
+.pat-input-wrap select {
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.92);
+  outline: none;
+  font-size: clamp(14px, 1.1vw, 16px);
+  color: #0f172a;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+  cursor: pointer;
+}
+
 .pat-dark .pat-input-wrap input {
+  background: rgba(2, 6, 23, 0.85);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #e5e7eb;
+}
+
+.pat-dark .pat-input-wrap select {
   background: rgba(2, 6, 23, 0.85);
   border-color: rgba(148, 163, 184, 0.22);
   color: #e5e7eb;
@@ -387,7 +406,18 @@
   transform: translateY(-1px);
 }
 
+.pat-input-wrap select:focus {
+  border-color: rgba(79, 70, 229, 0.85);
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.55), 0 12px 24px rgba(129, 140, 248, 0.2);
+  transform: translateY(-1px);
+}
+
 .pat-input-wrap.has-error input {
+  border-color: rgba(239, 68, 68, 0.95);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35);
+}
+
+.pat-input-wrap.has-error select {
   border-color: rgba(239, 68, 68, 0.95);
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35);
 }

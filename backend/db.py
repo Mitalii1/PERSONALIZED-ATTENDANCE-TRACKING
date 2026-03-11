@@ -4,9 +4,9 @@ from pymysql.cursors import DictCursor
 
 # Database configuration
 DB_CONFIG = {
-    "host": "localhost",      # MySQL server location
+    "host": "127.0.0.1",      # MySQL server location
     "user": "root",           # MySQL username
-    "password": "",           # your MySQL password (leave empty if none)
+    "password": "@Shan2006",           # your MySQL password (leave empty if none)
     "database": "attendance_db",   # database name you created
     "charset": "utf8mb4",
     "cursorclass": DictCursor
