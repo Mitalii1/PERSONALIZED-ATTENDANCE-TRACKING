@@ -94,15 +94,16 @@
 
 .pat-title {
   margin-top: 16px;
-  font-size: clamp(20px, 1.55vw, 26px);
+  padding-left: 50px;
+  font-size: clamp(50px, 1.55vw, 26px);
   font-weight: 650;
   letter-spacing: 0.02em;
 }
 
 .pat-tagline {
-  margin-top: 10px;
-  font-size: clamp(13px, 1.05vw, 15px);
-  max-width: 320px;
+  margin-left: 100px;
+  font-size: clamp(20px, 1.05vw, 15px);
+  max-width: 550px;
   color: #a1a1aa;
   line-height: 1.5;
 }
@@ -116,14 +117,15 @@
 /* Simple "illustration" area */
 .pat-illustration {
   position: relative;
-  margin-top: 28px;
+  margin-top: 20px;
   display: flex;
   gap: 14px;
+  align-items: center;
 }
 
 .pat-chip {
   flex: 1;
-  min-height: 130px;
+  min-height: 120px;
   background: rgba(15, 23, 42, 0.82);
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -138,7 +140,6 @@
 }
 
 .pat-chip-2 {
-  transform: translateY(10px);
   opacity: 0.96;
 }
 
