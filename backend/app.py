@@ -17,6 +17,7 @@ def signup():
         data = request.json
         name = data.get("name", "").strip()
         email = data.get("email", "").strip()
+        
         password = data.get("password", "").strip()
         year = data.get("year", "")
 
