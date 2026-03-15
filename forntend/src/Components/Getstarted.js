@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './getstarted.css';
 
-function Getstarted() {
+function Getstarted({ onRegistered }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [theme, setTheme] = useState(() => localStorage.getItem('pat-theme') || 'light'); // 'light' | 'dark'
 
@@ -148,6 +148,13 @@ function Getstarted() {
         // Clear form on success
         if (isRegister) {
           setValues({ name: '', email: '', password: '', confirmPassword: '', year: '', remember: false });
+          if (typeof onRegistered === 'function') {
+            onRegistered({
+              name: values.name,
+              email: values.email,
+              year: values.year,
+            });
+          }
         } else {
           setValues({ ...values, password: '' });
         }
