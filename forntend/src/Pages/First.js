@@ -2,14 +2,14 @@ import '../App.css';
 import Getstarted from '../Components/Getstarted';
 import React from 'react';
 
-function first(){
-    return(
-        <>
-        <div className='first'>
-            <Getstarted />
-        </div>
-        </>
-    )
+function First({ onRegistered }) {
+  return (
+    <>
+      <div className="first">
+        <Getstarted onRegistered={onRegistered} />
+      </div>
+    </>
+  );
 }
 
-export default first;
+export default First;
