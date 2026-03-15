@@ -4,7 +4,7 @@ import './Timetable.css';
 function Timetable() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
-  const [year, setYear] = useState('');
+  const [subjectsText, setSubjectsText] = useState('');
   const [status, setStatus] = useState('');
 
   function onFileChange(e) {
@@ -23,13 +23,14 @@ function Timetable() {
 
   function onSubmit(e) {
     e.preventDefault();
-    if (!file || !year) {
-      setStatus('Please choose a year and upload a timetable photo first.');
+    if (!file && !subjectsText.trim()) {
+      setStatus('Please either upload a timetable image or enter your subjects manually.');
       return;
     }
-    // Placeholder for AI processing hook
+
+    // Placeholder for AI / backend hook
     setStatus(
-      'Your timetable image has been received. An AI service can now detect subjects and periods from this photo.'
+      'Your timetable details have been saved. An AI service can read your image and/or subjects to build an attendance tracker.'
     );
   }
 
@@ -50,24 +51,6 @@ function Timetable() {
         <form className="tt-form" onSubmit={onSubmit}>
           <div className="tt-field-group">
             <div className="tt-field">
-              <label className="tt-label" htmlFor="tt-year">
-                Academic year
-              </label>
-              <select
-                id="tt-year"
-                className="tt-select"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-              >
-                <option value="">Select year</option>
-                <option value="1">First Year</option>
-                <option value="2">Second Year</option>
-                <option value="3">Third Year</option>
-                <option value="4">Fourth Year</option>
-              </select>
-            </div>
-
-            <div className="tt-field">
               <label className="tt-label" htmlFor="tt-file">
                 Timetable image
               </label>
@@ -83,6 +66,24 @@ function Timetable() {
                 className="tt-file-input"
               />
             </div>
+
+            <div className="tt-field">
+              <label className="tt-label" htmlFor="tt-subjects">
+                Or type your subjects
+              </label>
+              <textarea
+                id="tt-subjects"
+                className="tt-textarea"
+                placeholder="Example:&#10;Maths&#10;Physics&#10;Chemistry&#10;Computer Science"
+                value={subjectsText}
+                onChange={(e) => setSubjectsText(e.target.value)}
+                rows={5}
+              />
+              <p className="tt-help">
+                You can list each subject on a new line. If you prefer, just upload a photo of your
+                timetable instead.
+              </p>
+            </div>
           </div>
 
           {preview && (
@@ -97,11 +98,12 @@ function Timetable() {
           <p className="tt-ai-note">
             <strong>AI note:</strong> This project can connect to an OCR/AI API (for example,
             Google Vision, Azure Cognitive Services, or a custom model) to automatically detect
-            subjects, time slots, and days from your timetable image.
+            subjects, time slots, and days from your timetable image, or combine your typed
+            subject list with detected periods.
           </p>
 
           <button type="submit" className="tt-primary">
-            Save timetable for this year
+            Save timetable details
           </button>
 
           {status && <p className="tt-status">{status}</p>}
