@@ -95,13 +95,6 @@ function Timetable() {
             </div>
           )}
 
-          <p className="tt-ai-note">
-            <strong>AI note:</strong> This project can connect to an OCR/AI API (for example,
-            Google Vision, Azure Cognitive Services, or a custom model) to automatically detect
-            subjects, time slots, and days from your timetable image, or combine your typed
-            subject list with detected periods.
-          </p>
-
           <button type="submit" className="tt-primary">
             Save timetable details
           </button>

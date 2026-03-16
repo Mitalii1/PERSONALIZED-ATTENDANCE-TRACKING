@@ -23,7 +23,8 @@
 
 .tt-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  align-items: center;
   gap: 16px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.45);
   padding-bottom: 12px;
@@ -35,11 +36,13 @@
   text-transform: uppercase;
   color: #a1a1aa;
   margin-bottom: 4px;
+  text-align: center;
 }
 
 .tt-title {
   margin: 0;
   font-size: clamp(22px, 1.7vw, 28px);
+  text-align: center;
 }
 
 .tt-subtitle {
@@ -47,6 +50,9 @@
   font-size: clamp(13px, 1.05vw, 15px);
   color: #9ca3af;
   max-width: 620px;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .tt-form {
