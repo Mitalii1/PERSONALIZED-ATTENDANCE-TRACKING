@@ -115,62 +115,30 @@ function Getstarted({ onRegistered }) {
     setSubmitting(true);
     setStatus({ type: '', message: '' });
 
-    try {
-      const endpoint = isRegister ? '/signup' : '/login';
-      const payload = isRegister
-        ? {
-            name: values.name,
-            email: values.email,
-            password: values.password,
-            year: values.year,
-          }
-        : {
-            email: values.email,
-            password: values.password,
-          };
+    // No backend call - just proceed to next page
+    setSubmitting(false);
+    setStatus({
+      type: 'success',
+      message: isRegister ? 'Account created successfully!' : 'Login successful!',
+    });
 
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSubmitting(false);
-        setStatus({
-          type: 'success',
-          message: data.message || (isRegister ? 'Account created successfully!' : 'Login successful!'),
-        });
-        // Clear form on success
-        if (isRegister) {
-          setValues({ name: '', email: '', password: '', confirmPassword: '', year: '', remember: false });
-          if (typeof onRegistered === 'function') {
-            onRegistered({
-              name: values.name,
-              email: values.email,
-              year: values.year,
-            });
-          }
-        } else {
-          setValues({ ...values, password: '' });
-        }
-      } else {
-        setSubmitting(false);
-        setStatus({
-          type: 'error',
-          message: data.message || 'Something went wrong. Please try again.',
+    // Clear form on success
+    if (isRegister) {
+      setValues({ name: '', email: '', password: '', confirmPassword: '', year: '', remember: false });
+      if (typeof onRegistered === 'function') {
+        onRegistered({
+          name: values.name,
+          email: values.email,
+          year: values.year,
         });
       }
-    } catch (error) {
-      setSubmitting(false);
-      setStatus({
-        type: 'error',
-        message: 'Connection error. Make sure the backend is running on http://localhost:5000',
-      });
+    } else {
+      setValues({ ...values, password: '' });
+      if (typeof onRegistered === 'function') {
+        onRegistered({
+          email: values.email,
+        });
+      }
     }
   }
 
