@@ -3,7 +3,7 @@ from PIL import Image
 import io
 
 # Configure Gemini API
-genai.configure(api_key="AIzaSyB1N6R1zXtG6wr9wte9NaCsfrZewNi0fKQ")
+genai.configure(api_key="")
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 def detect_subjects_from_timetable(image_data):
