@@ -6,6 +6,9 @@ function Timetable() {
   const [preview, setPreview] = useState('');
   const [subjectsText, setSubjectsText] = useState('');
   const [status, setStatus] = useState('');
+  const [detectedSubjects, setDetectedSubjects] = useState([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
 
   function onFileChange(e) {
     const selected = e.target.files?.[0];
@@ -28,10 +31,76 @@ function Timetable() {
       return;
     }
 
-    // Placeholder for AI / backend hook
-    setStatus(
-      'Your timetable details have been saved. An AI service can read your image and/or subjects to build an attendance tracker.'
-    );
+    // If file is uploaded, send to backend for OCR processing
+    if (file) {
+      sendImageToBackend(file);
+    } else if (subjectsText.trim()) {
+      // If only subjects text is provided, use that
+      const subjects = subjectsText
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      setDetectedSubjects(subjects);
+      setShowConfirmation(true);
+    }
+  }
+
+  async function sendImageToBackend(imageFile) {
+    try {
+      setStatus('Processing image... Please wait.');
+      
+      const formData = new FormData();
+      formData.append('file', imageFile);
+
+      const response = await fetch('http://localhost:5000/detect-subjects', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatus(`Error: ${data.message}`);
+        return;
+      }
+
+      if (data.subjects && data.subjects.length > 0) {
+        setDetectedSubjects(data.subjects);
+        setShowConfirmation(true);
+        setStatus('');
+      } else {
+        setStatus('No subjects could be detected from the image. Please enter subjects manually or try a clearer image.');
+      }
+    } catch (error) {
+      setStatus(`Error: ${error.message}`);
+      console.error('Error sending image to backend:', error);
+    }
+  }
+
+  function addNewSubject() {
+    if (newSubject.trim()) {
+      setDetectedSubjects([...detectedSubjects, newSubject.trim()]);
+      setNewSubject('');
+    }
+  }
+
+  function removeSubject(index) {
+    setDetectedSubjects(detectedSubjects.filter((_, i) => i !== index));
+  }
+
+  function confirmAndSave() {
+    if (detectedSubjects.length === 0) {
+      setStatus('Please add at least one subject.');
+      return;
+    }
+    setStatus('Your timetable and subjects have been saved successfully!');
+    setShowConfirmation(false);
+    setDetectedSubjects([]);
+  }
+
+  function cancelConfirmation() {
+    setShowConfirmation(false);
+    setDetectedSubjects([]);
   }
 
   return (
@@ -98,6 +167,64 @@ function Timetable() {
           <button type="submit" className="tt-primary">
             Save timetable details
           </button>
+
+          {showConfirmation && detectedSubjects.length > 0 && (
+            <div className="tt-detection-section">
+              <h3 className="tt-detection-title">Detected Subjects</h3>
+              <p className="tt-detection-subtitle">Please confirm the detected subjects or add any missing ones.</p>
+              
+              <div className="tt-subjects-list">
+                {detectedSubjects.map((subject, index) => (
+                  <div key={index} className="tt-subject-item">
+                    <span className="tt-subject-name">{subject}</span>
+                    <button
+                      type="button"
+                      className="tt-remove-btn"
+                      onClick={() => removeSubject(index)}
+                      title="Remove subject"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="tt-add-subject">
+                <input
+                  type="text"
+                  className="tt-add-input"
+                  placeholder="Add another subject..."
+                  value={newSubject}
+                  onChange={(e) => setNewSubject(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addNewSubject()}
+                />
+                <button
+                  type="button"
+                  className="tt-add-btn"
+                  onClick={addNewSubject}
+                >
+                  Add
+                </button>
+              </div>
+
+              <div className="tt-action-buttons">
+                <button
+                  type="button"
+                  className="tt-confirm-btn"
+                  onClick={confirmAndSave}
+                >
+                  Confirm & Save
+                </button>
+                <button
+                  type="button"
+                  className="tt-cancel-btn"
+                  onClick={cancelConfirmation}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {status && <p className="tt-status">{status}</p>}
         </form>

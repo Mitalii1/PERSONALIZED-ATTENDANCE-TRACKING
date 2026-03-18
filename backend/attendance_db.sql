@@ -1,1 +1,1 @@
-select * from subjects;
+select * from students;
