@@ -31,11 +31,13 @@ function Timetable() {
       return;
     }
 
-    // If file is uploaded, send to backend for OCR processing
+    // If file is uploaded, just show confirmation without backend
     if (file) {
-      sendImageToBackend(file);
+      setStatus('Image uploaded. Please enter your subjects manually or click save to proceed.');
+      setDetectedSubjects([]);
+      setShowConfirmation(false);
     } else if (subjectsText.trim()) {
-      // If only subjects text is provided, use that
+      // Parse manually entered subjects
       const subjects = subjectsText
         .split('\n')
         .map(s => s.trim())
