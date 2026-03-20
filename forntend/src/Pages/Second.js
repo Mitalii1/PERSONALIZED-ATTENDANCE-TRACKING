@@ -1,10 +1,10 @@
 import React from 'react';
 import Timetable from '../Components/Timetable';
 
-function Second({ onBack }) {
+function Second({ onBack, onSaved }) {
   return (
     <>
-      <Timetable />
+      <Timetable onSaved={onSaved} />
       {typeof onBack === 'function' && (
         <button
           type="button"

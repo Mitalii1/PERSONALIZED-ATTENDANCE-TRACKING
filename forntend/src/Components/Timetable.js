@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './Timetable.css';
 
-function Timetable() {
+function Timetable({ onSaved }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
   const [subjectsText, setSubjectsText] = useState('');
@@ -26,25 +26,32 @@ function Timetable() {
 
   function onSubmit(e) {
     e.preventDefault();
-    if (!file && !subjectsText.trim()) {
+    const manualSubjectsText = subjectsText.trim();
+    const manualSubjects = manualSubjectsText
+      ? manualSubjectsText
+          .split('\n')
+          .map(s => s.trim())
+          .filter(s => s.length > 0)
+      : [];
+
+    if (!file && manualSubjects.length === 0) {
       setStatus('Please either upload a timetable image or enter your subjects manually.');
       return;
     }
 
-    // If file is uploaded, just show confirmation without backend
-    if (file) {
-      setStatus('Image uploaded. Please enter your subjects manually or click save to proceed.');
-      setDetectedSubjects([]);
-      setShowConfirmation(false);
-    } else if (subjectsText.trim()) {
-      // Parse manually entered subjects
-      const subjects = subjectsText
-        .split('\n')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-      setDetectedSubjects(subjects);
-      setShowConfirmation(true);
+    // If the user manually enters subjects, skip AI detection and save immediately.
+    if (manualSubjects.length > 0) {
+      saveSubjects(manualSubjects);
+      return;
     }
+
+    // No manual subjects: only then run AI detection from the uploaded image.
+    if (file) {
+      sendImageToBackend(file);
+      return;
+    }
+
+    setStatus('Please add at least one subject.');
   }
 
   async function sendImageToBackend(imageFile) {
@@ -95,14 +102,27 @@ function Timetable() {
       setStatus('Please add at least one subject.');
       return;
     }
-    setStatus('Your timetable and subjects have been saved successfully!');
-    setShowConfirmation(false);
-    setDetectedSubjects([]);
+    saveSubjects(detectedSubjects);
   }
 
   function cancelConfirmation() {
     setShowConfirmation(false);
     setDetectedSubjects([]);
+  }
+
+  function saveSubjects(subjects) {
+    if (!subjects || subjects.length === 0) {
+      setStatus('Please add at least one subject.');
+      return;
+    }
+
+    setStatus('Your timetable and subjects have been saved successfully!');
+    setShowConfirmation(false);
+    setDetectedSubjects([]);
+
+    if (typeof onSaved === 'function') {
+      onSaved();
+    }
   }
 
   return (
