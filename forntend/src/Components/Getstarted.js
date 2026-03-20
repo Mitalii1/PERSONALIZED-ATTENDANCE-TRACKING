@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './getstarted.css';
 
-function Getstarted({ onRegistered }) {
+function Getstarted({ onLogin, onRegistered }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [theme, setTheme] = useState(() => localStorage.getItem('pat-theme') || 'light'); // 'light' | 'dark'
 
@@ -134,8 +134,8 @@ function Getstarted({ onRegistered }) {
       }
     } else {
       setValues({ ...values, password: '' });
-      if (typeof onRegistered === 'function') {
-        onRegistered({
+      if (typeof onLogin === 'function') {
+        onLogin({
           email: values.email,
         });
       }

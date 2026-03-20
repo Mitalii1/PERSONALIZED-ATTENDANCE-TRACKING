@@ -2,11 +2,11 @@ import '../App.css';
 import Getstarted from '../Components/Getstarted';
 import React from 'react';
 
-function First({ onRegistered }) {
+function First({ onLogin, onRegistered }) {
   return (
     <>
       <div className="first">
-        <Getstarted onRegistered={onRegistered} />
+        <Getstarted onLogin={onLogin} onRegistered={onRegistered} />
       </div>
     </>
   );
