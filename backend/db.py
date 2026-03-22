@@ -1,32 +1,15 @@
 import pymysql
+import os
+from dotenv import load_dotenv
 from pymysql.cursors import DictCursor
 
-
-# Database configuration
-DB_CONFIG = {
-    "host": "127.0.0.1",      # MySQL server location
-    "user": "root",           # MySQL username
-    "password": "@Shan2006",           # your MySQL password (leave empty if none)
-    "database": "attendance_db",   # database name you created
-    "charset": "utf8mb4",
-    "cursorclass": DictCursor
-}
-
+load_dotenv()
 
 def get_connection():
-    """
-    This function creates a connection to MySQL.
-    Whenever we want to run a query (SELECT, INSERT, UPDATE),
-    we call this function.
-    """
-
-    connection = pymysql.connect(
-        host=DB_CONFIG["host"],
-        user=DB_CONFIG["user"],
-        password=DB_CONFIG["password"],
-        database=DB_CONFIG["database"],
-        charset=DB_CONFIG["charset"],
-        cursorclass=DB_CONFIG["cursorclass"]
+    return pymysql.connect(
+        host=os.getenv('DB_HOST', 'localhost'),
+        user=os.getenv('DB_USER', 'root'),
+        password=os.getenv('DB_PASSWORD', ''),
+        database=os.getenv('DB_NAME', 'attendance_db'),
+        cursorclass=pymysql.cursors.DictCursor
     )
-
-    return connection
