@@ -1,20 +1,15 @@
-from flask import Flask, request, jsonify
+import os
+from dotenv import load_dotenv
+from flask import request, jsonify
 from flask_cors import CORS
-import pytesseract
-from PIL import Image
+from timetable_ai import extract_subjects_from_image
+from flask import Flask
 import io
 import re
 from werkzeug.utils import secure_filename
-import os
+from db import get_connection
 
-# Configure pytesseract path for Windows
-# If Tesseract is installed in default location, it should auto-detect
-# If not found, try common installation paths
-if os.name == 'nt':  # Windows
-    try:
-        pytesseract.pytesseract.pytesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    except:
-        pass
+load_dotenv()  
 
 app = Flask(__name__)
 CORS(app)
@@ -57,82 +52,121 @@ def login():
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
+@app.route('/api/timetable/extract', methods=['POST'])
+def extract_timetable():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
 
-# DETECT SUBJECTS FROM TIMETABLE IMAGE
-@app.route("/detect-subjects", methods=["POST"])
-def detect_subjects():
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "Empty filename"}), 400
+
+    allowed = {'png', 'jpg', 'jpeg', 'webp'}
+    ext = file.filename.rsplit('.', 1)[-1].lower()
+    if ext not in allowed:
+        return jsonify({"error": f"File type '{ext}' not supported."}), 400
+
     try:
-        # Check if image file is in the request
-        if 'file' not in request.files:
-            return jsonify({"message": "No file provided"}), 400
-        
-        file = request.files['file']
-        
-        if file.filename == '':
-            return jsonify({"message": "No file selected"}), 400
-        
-        # Check file extension
-        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
-        if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
-            return jsonify({"message": "Invalid file format. Please upload an image."}), 400
-        
-        # Read image from request
-        img = Image.open(io.BytesIO(file.read()))
-        
-        # Enhance image for better OCR (optional: resize if too small)
-        img_width, img_height = img.size
-        if img_width < 400 or img_height < 400:
-            scale_factor = max(400 / img_width, 400 / img_height)
-            new_size = (int(img_width * scale_factor), int(img_height * scale_factor))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # Extract text using pytesseract
-        extracted_text = pytesseract.image_to_string(img)
-        
-        if not extracted_text.strip():
-            return jsonify({
-                "message": "No text detected in image",
-                "subjects": []
-            }), 200
-        
-        # Parse subjects from extracted text
-        # Common patterns: each line could be a subject or time slot
-        lines = extracted_text.split('\n')
-        subjects = []
-        
-        # Filter out common timetable headers and noise
-        common_headers = ['time', 'day', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
-                         'saturday', 'sunday', 'period', 'slot', 'am', 'pm', 'period', ':']
-        
-        for line in lines:
-            cleaned_line = line.strip().lower()
-            
-            # Skip empty lines and very short text
-            if len(cleaned_line) < 3:
-                continue
-            
-            # Skip lines that are just numbers or common headers
-            if cleaned_line.isdigit() or any(header in cleaned_line for header in common_headers):
-                continue
-            
-            # Skip lines with mostly special characters
-            if sum(1 for c in cleaned_line if c.isalpha()) < len(cleaned_line) * 0.5:
-                continue
-            
-            # Clean up the subject name
-            subject = line.strip()
-            subject = re.sub(r'[0-9\-\/:\.]+', '', subject).strip()
-            
-            if subject and len(subject) >= 3 and subject not in subjects:
-                subjects.append(subject)
-        
-        return jsonify({
-            "message": "Subjects detected successfully",
-            "subjects": subjects[:20]  # Limit to 20 subjects
-        }), 200
-    
+        image_bytes = file.read()
+        result = extract_subjects_from_image(image_bytes)
+        return jsonify({"success": True, "data": result}), 200
     except Exception as e:
-        return jsonify({"message": f"Error processing image: {str(e)}", "subjects": []}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/timetable/save-subjects', methods=['POST'])
+def save_subjects():
+    """
+    Saves confirmed subjects to the database.
+    
+    Expected JSON body:
+    {
+      "user_id": 1,
+      "subjects": [
+        {"full": "Advanced Data Structures", "type": ["Theory"]},
+        {"full": "Java Programming",          "type": ["Theory", "Practical"]},
+        {"full": "Computer Networks Lab",     "type": ["Practical"]}
+      ]
+    }
+    """
+    data = request.get_json()
+
+    user_id  = data.get('user_id')
+    subjects = data.get('subjects', [])
+
+    if not user_id:
+        return jsonify({"success": False, "error": "user_id is required"}), 400
+
+    if not subjects:
+        return jsonify({"success": False, "error": "No subjects provided"}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Delete existing subjects for this user first (fresh save)
+        cursor.execute("DELETE FROM subjects WHERE user_id = %s", (user_id,))
+
+        # Insert each subject
+        for subject in subjects:
+            name = subject.get('full', '').strip()
+            types = subject.get('type', ['Theory'])
+
+            if not name:
+                continue
+
+            # Convert type array to string
+            # ['Theory'] → 'Theory'
+            # ['Practical'] → 'Practical'
+            # ['Theory', 'Practical'] → 'Both'
+            if 'Theory' in types and 'Practical' in types:
+                type_str = 'Both'
+            elif 'Practical' in types:
+                type_str = 'Practical'
+            else:
+                type_str = 'Theory'
+
+            cursor.execute("""
+                INSERT INTO subjects (user_id, subject_name, type, total_classes, attended_classes)
+                VALUES (%s, %s, %s, 0, 0)
+            """, (user_id, name, type_str))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": f"{len(subjects)} subjects saved successfully"
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Get subjects for a user ───────────────────────────────────────────────────
+
+@app.route('/api/subjects/<int:user_id>', methods=['GET'])
+def get_subjects(user_id):
+    """Returns all subjects for a given user."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, subject_name, type, total_classes, attended_classes
+            FROM subjects
+            WHERE user_id = %s
+            ORDER BY subject_name
+        """, (user_id,))
+
+        subjects = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"success": True, "subjects": subjects}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
