@@ -1,128 +1,161 @@
-import React, { useState } from 'react';
-import './Timetable.css';
+import React, { useState } from "react";
+import SubjectMapper from "./SubjectMapper";
+import "./Timetable.css";
+
+const BACKEND_URL =
+  process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
 function Timetable({ onSaved }) {
   const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState('');
-  const [subjectsText, setSubjectsText] = useState('');
-  const [status, setStatus] = useState('');
-  const [detectedSubjects, setDetectedSubjects] = useState([]);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [newSubject, setNewSubject] = useState('');
+  const [preview, setPreview] = useState("");
+  const [subjectsText, setSubjectsText] = useState("");
+  const [status, setStatus] = useState("");
+  const [abbreviations, setAbbreviations] = useState([]);
+  const [showMapper, setShowMapper] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusType, setStatusType] = useState("success");
 
   function onFileChange(e) {
     const selected = e.target.files?.[0];
     if (!selected) {
       setFile(null);
-      setPreview('');
+      setPreview("");
       return;
     }
     setFile(selected);
-    setStatus('');
-
-    const url = URL.createObjectURL(selected);
-    setPreview(url);
+    setStatus("");
+    setPreview(URL.createObjectURL(selected));
   }
 
   function onSubmit(e) {
     e.preventDefault();
-    const manualSubjectsText = subjectsText.trim();
-    const manualSubjects = manualSubjectsText
-      ? manualSubjectsText
-          .split('\n')
-          .map(s => s.trim())
-          .filter(s => s.length > 0)
+
+    const manualSubjects = subjectsText.trim()
+      ? subjectsText
+          .trim()
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [];
 
     if (!file && manualSubjects.length === 0) {
-      setStatus('Please either upload a timetable image or enter your subjects manually.');
+      setStatus("Please upload a timetable image or enter subjects manually.");
+      setStatusType("error");
       return;
     }
 
-    // If the user manually enters subjects, skip AI detection and save immediately.
+    // User typed subjects manually — skip AI, save directly
     if (manualSubjects.length > 0) {
-      saveSubjects(manualSubjects);
+      const formatted = manualSubjects.map((name) => ({
+        full: name,
+        type: ["Theory"], // default type for manually entered subjects
+      }));
+      saveSubjectsToDB(formatted);
       return;
     }
 
-    // No manual subjects: only then run AI detection from the uploaded image.
+    // User uploaded image — use AI detection
     if (file) {
       sendImageToBackend(file);
-      return;
     }
-
-    setStatus('Please add at least one subject.');
   }
 
   async function sendImageToBackend(imageFile) {
-    try {
-      setStatus('Processing image... Please wait.');
-      
-      const formData = new FormData();
-      formData.append('file', imageFile);
+    // Show loading state
+    setIsLoading(true);
+    setStatus("Analyzing timetable image... Please wait.");
+    setStatusType("success");
 
-      const response = await fetch('http://localhost:5000/detect-subjects', {
-        method: 'POST',
+    // FormData is how we send files to a server
+    const formData = new FormData();
+    formData.append("image", imageFile); // ⚠️ must be 'image' not 'file'
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/timetable/extract`, {
+        method: "POST",
         body: formData,
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        setStatus(`Error: ${data.message}`);
+      // Check if something went wrong
+      if (!response.ok || !data.success) {
+        setStatus(`Error: ${data.error || "Something went wrong."}`);
+        setStatusType("error");
         return;
       }
 
-      if (data.subjects && data.subjects.length > 0) {
-        setDetectedSubjects(data.subjects);
-        setShowConfirmation(true);
-        setStatus('');
+      // Check if AI found subjects
+      if (data.data?.abbreviations?.length > 0) {
+        setAbbreviations(data.data.abbreviations);
+        setShowMapper(true);
+        setStatus("");
       } else {
-        setStatus('No subjects could be detected from the image. Please enter subjects manually or try a clearer image.');
+        setStatus(
+          "No subjects detected. Please enter them manually or try a clearer image.",
+        );
+        setStatusType("error");
       }
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
-      console.error('Error sending image to backend:', error);
+      // This runs if backend is not running
+      setStatus(`Could not reach server: ${error.message}`);
+      setStatusType("error");
+    } finally {
+      setIsLoading(false); // always stop loading whether success or error
     }
   }
 
-  function addNewSubject() {
-    if (newSubject.trim()) {
-      setDetectedSubjects([...detectedSubjects, newSubject.trim()]);
-      setNewSubject('');
+  async function saveSubjectsToDB(subjects) {
+    setIsLoading(true);
+    setStatus("Saving subjects to database...");
+    setStatusType("success");
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/timetable/save-subjects`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: 1, // 🔴 replace with actual logged-in user's ID later
+            subjects: subjects,
+            // subjects looks like: [{ full: "Java Programming", type: ["Theory"] }]
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setStatus(`Error saving: ${data.error || "Something went wrong."}`);
+        setStatusType("error");
+        return;
+      }
+
+      // Success — reset the form
+      setStatus(`✅ ${data.message}`);
+      setStatusType("success");
+      setFile(null);
+      setPreview("");
+      setSubjectsText("");
+      setAbbreviations([]);
+
+      if (typeof onSaved === "function") {
+        onSaved(subjects);
+      }
+    } catch (error) {
+      setStatus(`Could not reach server: ${error.message}`);
+      setStatusType("error");
+    } finally {
+      setIsLoading(false);
     }
   }
 
-  function removeSubject(index) {
-    setDetectedSubjects(detectedSubjects.filter((_, i) => i !== index));
-  }
-
-  function confirmAndSave() {
-    if (detectedSubjects.length === 0) {
-      setStatus('Please add at least one subject.');
-      return;
-    }
-    saveSubjects(detectedSubjects);
-  }
-
-  function cancelConfirmation() {
-    setShowConfirmation(false);
-    setDetectedSubjects([]);
-  }
-
-  function saveSubjects(subjects) {
-    if (!subjects || subjects.length === 0) {
-      setStatus('Please add at least one subject.');
-      return;
-    }
-
-    setStatus('Your timetable and subjects have been saved successfully!');
-    setShowConfirmation(false);
-    setDetectedSubjects([]);
-
-    if (typeof onSaved === 'function') {
-      onSaved();
-    }
+  async function handleMapperConfirm(confirmedMapping) {
+    setShowMapper(false); // hide the mapper
+    await saveSubjectsToDB(confirmedMapping); // save to database
   }
 
   return (
@@ -133,8 +166,8 @@ function Timetable({ onSaved }) {
             <p className="tt-eyebrow">Step 2 · Timetable setup</p>
             <h2 className="tt-title">Upload your yearly timetable</h2>
             <p className="tt-subtitle">
-              Add a clear photo or screenshot of your official timetable. Later, an AI service can
-              read subjects and periods to auto-create an attendance grid.
+              Add a clear photo or screenshot of your official timetable. AI
+              will detect subjects and you can confirm or correct the names.
             </p>
           </div>
         </header>
@@ -146,7 +179,9 @@ function Timetable({ onSaved }) {
                 Timetable image
               </label>
               <label className="tt-dropzone" htmlFor="tt-file">
-                <span className="tt-drop-main">Drop image here or click to upload</span>
+                <span className="tt-drop-main">
+                  Drop image here or click to upload
+                </span>
                 <span className="tt-drop-hint">PNG, JPG up to 10MB</span>
               </label>
               <input
@@ -165,14 +200,16 @@ function Timetable({ onSaved }) {
               <textarea
                 id="tt-subjects"
                 className="tt-textarea"
-                placeholder="Example:&#10;Maths&#10;Physics&#10;Chemistry&#10;Computer Science"
+                placeholder={
+                  "Example:\nMaths\nPhysics\nChemistry\nComputer Science"
+                }
                 value={subjectsText}
                 onChange={(e) => setSubjectsText(e.target.value)}
                 rows={5}
               />
               <p className="tt-help">
-                You can list each subject on a new line. If you prefer, just upload a photo of your
-                timetable instead.
+                List each subject on a new line, or just upload a photo of your
+                timetable.
               </p>
             </div>
           </div>
@@ -186,74 +223,36 @@ function Timetable({ onSaved }) {
             </div>
           )}
 
-          <button type="submit" className="tt-primary">
-            Save timetable details
+          <button type="submit" className="tt-primary" disabled={isLoading}>
+            {isLoading ? "Processing..." : "Save timetable details"}
           </button>
 
-          {showConfirmation && detectedSubjects.length > 0 && (
-            <div className="tt-detection-section">
-              <h3 className="tt-detection-title">Detected Subjects</h3>
-              <p className="tt-detection-subtitle">Please confirm the detected subjects or add any missing ones.</p>
-              
-              <div className="tt-subjects-list">
-                {detectedSubjects.map((subject, index) => (
-                  <div key={index} className="tt-subject-item">
-                    <span className="tt-subject-name">{subject}</span>
-                    <button
-                      type="button"
-                      className="tt-remove-btn"
-                      onClick={() => removeSubject(index)}
-                      title="Remove subject"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="tt-add-subject">
-                <input
-                  type="text"
-                  className="tt-add-input"
-                  placeholder="Add another subject..."
-                  value={newSubject}
-                  onChange={(e) => setNewSubject(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addNewSubject()}
-                />
-                <button
-                  type="button"
-                  className="tt-add-btn"
-                  onClick={addNewSubject}
-                >
-                  Add
-                </button>
-              </div>
-
-              <div className="tt-action-buttons">
-                <button
-                  type="button"
-                  className="tt-confirm-btn"
-                  onClick={confirmAndSave}
-                >
-                  Confirm & Save
-                </button>
-                <button
-                  type="button"
-                  className="tt-cancel-btn"
-                  onClick={cancelConfirmation}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+          {status && (
+            <p
+              className="tt-status"
+              style={{
+                color: statusType === "error" ? "#ef4444" : "#22c55e",
+              }}
+            >
+              {status}
+            </p>
           )}
-
-          {status && <p className="tt-status">{status}</p>}
         </form>
+
+        {showMapper && (
+          <SubjectMapper
+            abbreviations={abbreviations}
+            onConfirm={handleMapperConfirm}
+            onCancel={() => {
+              setShowMapper(false);
+              setAbbreviations([]);
+              setStatus("");
+            }}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 export default Timetable;
-
