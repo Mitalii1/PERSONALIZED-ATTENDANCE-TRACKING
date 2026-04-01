@@ -8,6 +8,7 @@ import io
 import re
 from werkzeug.utils import secure_filename
 from db import get_connection
+from attendance import get_timetable_week, get_todays_schedule, mark_attendance, get_attendance_summary
 
 load_dotenv()  
 
@@ -75,49 +76,33 @@ def extract_timetable():
 
 @app.route('/api/timetable/save-subjects', methods=['POST'])
 def save_subjects():
-    """
-    Saves confirmed subjects to the database.
-    
-    Expected JSON body:
-    {
-      "user_id": 1,
-      "subjects": [
-        {"full": "Advanced Data Structures", "type": ["Theory"]},
-        {"full": "Java Programming",          "type": ["Theory", "Practical"]},
-        {"full": "Computer Networks Lab",     "type": ["Practical"]}
-      ]
-    }
-    """
-    data = request.get_json()
-
+    data     = request.get_json()
     user_id  = data.get('user_id')
     subjects = data.get('subjects', [])
+    schedule = data.get('schedule', {})
 
     if not user_id:
         return jsonify({"success": False, "error": "user_id is required"}), 400
-
-    if not subjects:
-        return jsonify({"success": False, "error": "No subjects provided"}), 400
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Delete existing subjects for this user first (fresh save)
+        # Clear old data
+        cursor.execute("DELETE FROM timetable_schedule WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM subjects WHERE user_id = %s", (user_id,))
 
-        # Insert each subject
+        # Insert subjects, store id by short code
+        subject_id_map = {}
+
         for subject in subjects:
-            name = subject.get('full', '').strip()
+            name  = subject.get('full', '').strip()
+            short = subject.get('short', '').strip()
             types = subject.get('type', ['Theory'])
 
             if not name:
                 continue
 
-            # Convert type array to string
-            # ['Theory'] → 'Theory'
-            # ['Practical'] → 'Practical'
-            # ['Theory', 'Practical'] → 'Both'
             if 'Theory' in types and 'Practical' in types:
                 type_str = 'Both'
             elif 'Practical' in types:
@@ -126,9 +111,40 @@ def save_subjects():
                 type_str = 'Theory'
 
             cursor.execute("""
-                INSERT INTO subjects (user_id, subject_name, type, total_classes, attended_classes)
+                INSERT INTO subjects 
+                    (user_id, subject_name, type, total_classes, attended_classes)
                 VALUES (%s, %s, %s, 0, 0)
             """, (user_id, name, type_str))
+
+            subject_id_map[short] = cursor.lastrowid
+
+        # Slot key to time label
+        slot_times = {
+            's1': '8:15-10:15',
+            's2': '10:30-11:30',
+            's3': '11:30-12:30',
+            'a1': '1:15-2:15',
+            'a2': '2:15-3:15',
+        }
+
+        # Insert schedule
+        # schedule from frontend looks like:
+        # { "Monday": ["ADASL", "PROGG", "SEM"], "Tuesday": [...] }
+        for day, subject_list in schedule.items():
+            slot_keys = ['s1', 's2', 's3', 'a1', 'a2']
+            for i, short in enumerate(subject_list):
+                if i >= len(slot_keys):
+                    break
+                slot_key   = slot_keys[i]
+                time_slot  = slot_times[slot_key]
+                subject_id = subject_id_map.get(short)
+
+                if subject_id:
+                    cursor.execute("""
+                        INSERT INTO timetable_schedule 
+                            (user_id, subject_id, day_of_week, slot_key, time_slot)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (user_id, subject_id, day, slot_key, time_slot))
 
         conn.commit()
         cursor.close()
@@ -141,7 +157,6 @@ def save_subjects():
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 # ── Get subjects for a user ───────────────────────────────────────────────────
 
@@ -168,6 +183,72 @@ def get_subjects(user_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/timetable/week/<int:user_id>', methods=['GET'])
+def timetable_week(user_id):
+    """
+    Returns full week in format frontend expects:
+    [
+      { "day": "Monday", "s1": "Java", "s2": "Math", "s3": "DBMS", "a1": "Physics", "a2": "Seminar" },
+      ...
+    ]
+    """
+    try:
+        week = get_timetable_week(user_id)
+        return jsonify({"success": True, "week": week}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Get today's schedule ──────────────────────────────────────────────────────
+@app.route('/api/attendance/today/<int:user_id>', methods=['GET'])
+def todays_schedule(user_id):
+    try:
+        today = get_todays_schedule(user_id)
+        return jsonify({"success": True, "data": today}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Mark attendance ───────────────────────────────────────────────────────────
+@app.route('/api/attendance/mark', methods=['POST'])
+def mark_student_attendance():
+    """
+    Expected JSON:
+    {
+      "user_id": 1,
+      "records": [
+        { "subject_id": 1, "slot_key": "s1", "time_slot": "8:15-10:15", "status": "Present" },
+        { "subject_id": 2, "slot_key": "s2", "time_slot": "10:30-11:30", "status": "Absent" }
+      ]
+    }
+    """
+    data    = request.get_json()
+    user_id = data.get('user_id')
+    records = data.get('records', [])
+
+    if not user_id:
+        return jsonify({"success": False, "error": "user_id is required"}), 400
+    if not records:
+        return jsonify({"success": False, "error": "No records provided"}), 400
+
+    try:
+        saved = mark_attendance(user_id, records)
+        return jsonify({
+            "success": True,
+            "message": f"Attendance marked for {saved} classes"
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Attendance summary ────────────────────────────────────────────────────────
+@app.route('/api/attendance/summary/<int:user_id>', methods=['GET'])
+def attendance_summary(user_id):
+    try:
+        summary = get_attendance_summary(user_id)
+        return jsonify({"success": True, "summary": summary}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
