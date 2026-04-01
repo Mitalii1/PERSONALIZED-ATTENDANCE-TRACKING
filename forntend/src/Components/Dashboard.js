@@ -14,18 +14,33 @@ function Dashboard() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
-  const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
-  const subjectStats = useMemo(
-    () => ({
-      Math: { totalLectures: 30, attendedLectures: 25 },
-      Java: { totalLectures: 28, attendedLectures: 23 },
-      Physics: { totalLectures: 24, attendedLectures: 19 },
-      DBMS: { totalLectures: 26, attendedLectures: 22 },
-    }),
-    []
-  );
-  const subjects = Object.keys(subjectStats);
+  const normalizeSubject = (subjectText) => {
+    if (!subjectText || !String(subjectText).trim()) return null;
+    const cleanup = String(subjectText).trim();
+    const removeTokens = [
+      'Practical',
+      'Lab',
+      'Seminar',
+      'Project',
+      'Elective',
+      'Review',
+      'Workshop',
+      'Session',
+      'Tutorial',
+      'Class',
+      'Lecture',
+      'Theory',
+    ];
+    let normalized = cleanup;
+    removeTokens.forEach((token) => {
+      normalized = normalized.replace(new RegExp(`\\b${token}\\b`, 'gi'), '');
+    });
+    normalized = normalized.replace(/[-\/]/g, ' ').trim();
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+    return normalized;
+  };
 
   const [timetableWeek, setTimetableWeek] = useState([
     { day: 'Monday', s1: 'Java Practical', s2: 'Math', s3: 'DBMS', a1: 'Physics', a2: 'Seminar' },
@@ -35,43 +50,77 @@ function Dashboard() {
     { day: 'Friday', s1: 'Java', s2: 'Math', s3: 'Physics', a1: 'Seminar', a2: 'Review' },
   ]);
 
-  const [subjectAttendedCounts, setSubjectAttendedCounts] = useState({
-    Math: 25,
-    Java: 23,
-    Physics: 19,
-    DBMS: 22,
-  });
+  const subjects = useMemo(() => {
+    const set = new Set();
+    timetableWeek.forEach((row) => {
+      ['s1', 's2', 's3', 'a1', 'a2'].forEach((field) => {
+        const subjectName = normalizeSubject(row[field]);
+        if (subjectName) set.add(subjectName);
+      });
+    });
+    return Array.from(set).sort();
+  }, [timetableWeek]);
 
   const [slotAttendanceChecked, setSlotAttendanceChecked] = useState({});
 
-  const subjectStatsLive = useMemo(() => {
-    const out = {};
-    subjects.forEach((k) => {
-      out[k] = {
-        ...subjectStats[k],
-        attendedLectures: subjectAttendedCounts[k] ?? subjectStats[k].attendedLectures,
+  const timetableSubjectTotals = useMemo(() => {
+    const totals = {};
+    timetableWeek.forEach((row) => {
+      ['s1', 's2', 's3', 'a1', 'a2'].forEach((field) => {
+        const normalized = normalizeSubject(row[field]);
+        if (!normalized) return;
+        totals[normalized] = (totals[normalized] || 0) + 1;
+      });
+    });
+    return totals;
+  }, [timetableWeek]);
+
+  const timetableSubjectAttended = useMemo(() => {
+    const attended = {};
+    Object.entries(slotAttendanceChecked).forEach(([slotKey, isChecked]) => {
+      if (!isChecked) return;
+      const [day, field] = slotKey.split('_');
+      const row = timetableWeek.find((item) => item.day === day);
+      if (!row) return;
+      const subjectName = normalizeSubject(row[field]);
+      if (!subjectName) return;
+      attended[subjectName] = (attended[subjectName] || 0) + 1;
+    });
+    return attended;
+  }, [slotAttendanceChecked, timetableWeek]);
+
+  const weeklySubjectData = useMemo(() => {
+    const data = {};
+    subjects.forEach((sub) => {
+      const total = timetableSubjectTotals[sub] || 0;
+      const attended = timetableSubjectAttended[sub] || 0;
+      data[sub] = {
+        totalLectures: total,
+        attendedLectures: attended,
+        missedLectures: Math.max(0, total - attended),
+        attendedPercent: total === 0 ? 0 : Math.round((attended / total) * 100),
       };
     });
-    return out;
-  }, [subjectAttendedCounts, subjectStats, subjects]);
+    return data;
+  }, [subjects, timetableSubjectTotals, timetableSubjectAttended]);
 
   const overallTotal = useMemo(
-    () => subjects.reduce((sum, subject) => sum + subjectStats[subject].totalLectures, 0),
-    [subjectStats, subjects]
+    () => subjects.reduce((sum, subject) => sum + (weeklySubjectData[subject]?.totalLectures || 0), 0),
+    [subjects, weeklySubjectData]
   );
   const overallAttended = useMemo(
-    () => subjects.reduce((sum, subject) => sum + subjectStatsLive[subject].attendedLectures, 0),
-    [subjectStatsLive, subjects]
+    () => subjects.reduce((sum, subject) => sum + (weeklySubjectData[subject]?.attendedLectures || 0), 0),
+    [subjects, weeklySubjectData]
   );
 
   const currentStats = selectedSubject
-    ? subjectStatsLive[selectedSubject]
+    ? weeklySubjectData[selectedSubject] || { totalLectures: 0, attendedLectures: 0 }
     : { totalLectures: overallTotal, attendedLectures: overallAttended };
 
   const totalLectures = currentStats.totalLectures;
   const attendedLectures = currentStats.attendedLectures;
-  const missedLectures = totalLectures - attendedLectures;
-  const attendedPercent = totalLectures === 0 ? 0 : Math.round((attendedLectures / totalLectures) * 100);
+  const missedLectures = currentStats.totalLectures - currentStats.attendedLectures;
+  const attendedPercent = currentStats.totalLectures === 0 ? 0 : Math.round((currentStats.attendedLectures / currentStats.totalLectures) * 100);
   const missedPercent = 100 - attendedPercent;
 
   const now = new Date();
@@ -91,13 +140,10 @@ function Dashboard() {
   }, []);
 
   const matchSubjectFromCell = (cellText) => {
-    if (!cellText || !String(cellText).trim()) return null;
-    const t = String(cellText).toLowerCase();
-    const sorted = [...subjects].sort((a, b) => b.length - a.length);
-    for (const k of sorted) {
-      if (t.includes(k.toLowerCase())) return k;
-    }
-    return null;
+    const normalized = normalizeSubject(cellText);
+    if (!normalized) return null;
+    const found = subjects.find((s) => s.toLowerCase() === normalized.toLowerCase());
+    return found || normalized;
   };
 
   const toggleSlotAttendance = (day, field, cellText) => {
@@ -106,13 +152,6 @@ function Dashboard() {
     setSlotAttendanceChecked((prev) => {
       const was = !!prev[key];
       const next = !was;
-      const subjectKey = matchSubjectFromCell(cellText);
-      if (subjectKey) {
-        setSubjectAttendedCounts((sc) => ({
-          ...sc,
-          [subjectKey]: Math.max(0, (sc[subjectKey] ?? 0) + (next ? 1 : -1)),
-        }));
-      }
       return { ...prev, [key]: next };
     });
   };
@@ -123,18 +162,8 @@ function Dashboard() {
     );
   };
 
-  const handleSubjectButtonClick = () => {
-    if (selectedSubject) {
-      setSelectedSubject(null);
-      setShowSubjectDropdown(false);
-      return;
-    }
-    setShowSubjectDropdown((prev) => !prev);
-  };
-
   const handleSubjectSelect = (subject) => {
     setSelectedSubject(subject);
-    setShowSubjectDropdown(false);
   };
 
   return (
@@ -218,16 +247,29 @@ function Dashboard() {
               </p>
 
               <section className="dash-box-grid" aria-label="Student attendance summary">
-                <button
-                  type="button"
-                  className={`dash-box-btn ${selectedSubject ? 'dash-box-btn-active' : ''}`}
-                  onClick={handleSubjectButtonClick}
-                >
+                <div className="dash-box-btn subject-list-card">
                   <div className="dash-box-title">Subjects</div>
-                  <div className="dash-box-content">
-                    {selectedSubject ? `Selected: ${selectedSubject}` : 'Choose subject'}
+                  <div className="subject-list" role="list" aria-label="Subject selector">
+                    {subjects.map((subject) => {
+                      const isActive = selectedSubject === subject;
+                      return (
+                        <button
+                          key={subject}
+                          type="button"
+                          className={`subject-list-item ${isActive ? 'active' : ''}`}
+                          onClick={() => handleSubjectSelect(subject)}
+                          role="listitem"
+                          aria-pressed={isActive}
+                        >
+                          <span>{subject}</span>
+                          <span className="subject-list-count">
+                            {weeklySubjectData[subject]?.attendedLectures || 0}/{weeklySubjectData[subject]?.totalLectures || 0}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                </button>
+                </div>
 
                 <button type="button" className="dash-box-btn">
                   <div className="dash-box-title">Total Lectures</div>
@@ -239,21 +281,6 @@ function Dashboard() {
                   <div className="dash-box-content">{attendedLectures}</div>
                 </button>
               </section>
-
-              {showSubjectDropdown && (
-                <div className="subject-dropdown" aria-label="Subject list">
-                  {subjects.map((subject) => (
-                    <button
-                      key={subject}
-                      type="button"
-                      className="subject-option"
-                      onClick={() => handleSubjectSelect(subject)}
-                    >
-                      {subject}
-                    </button>
-                  ))}
-                </div>
-              )}
 
               <section className="dash-chart-card" aria-label="Weekly attendance chart">
                 <h2 className="dash-chart-title">
