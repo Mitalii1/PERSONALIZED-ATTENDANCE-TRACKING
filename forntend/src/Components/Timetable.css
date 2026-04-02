@@ -584,3 +584,160 @@
   color: #c4b5fd;
   white-space: nowrap;
 }
+
+/* ── Add More Subjects ────────────────────────────────────────────────────── */
+
+.mapper-add-subject-btn {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 2px dashed rgba(129, 140, 248, 0.6);
+  background: rgba(99, 102, 241, 0.08);
+  color: #a5b4fc;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  width: 100%;
+}
+
+.mapper-add-subject-btn:hover {
+  border-color: rgba(129, 140, 248, 0.9);
+  background: rgba(99, 102, 241, 0.12);
+  transform: translateY(-1px);
+}
+
+.mapper-add-subject-btn:active {
+  transform: translateY(0);
+}
+
+.mapper-add-subject-form {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  background: rgba(99, 102, 241, 0.05);
+  animation: slideIn 200ms ease;
+}
+
+.mapper-add-subject-form h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #a5b4fc;
+}
+
+.mapper-add-inputs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mapper-add-code-input,
+.mapper-add-name-input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.8);
+  color: #e5e7eb;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.mapper-add-code-input {
+  flex: 0 0 100px;
+}
+
+.mapper-add-name-input {
+  flex: 1;
+}
+
+.mapper-add-code-input:focus,
+.mapper-add-name-input:focus {
+  border-color: rgba(129, 140, 248, 0.8);
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.3);
+}
+
+.mapper-add-code-input::placeholder,
+.mapper-add-name-input::placeholder {
+  color: #4b5563;
+}
+
+.mapper-add-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mapper-add-confirm-btn,
+.mapper-add-cancel-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.mapper-add-confirm-btn {
+  background: rgba(34, 197, 94, 0.7);
+  color: #f9fafb;
+}
+
+.mapper-add-confirm-btn:hover {
+  background: rgba(34, 197, 94, 0.85);
+  transform: translateY(-1px);
+}
+
+.mapper-add-cancel-btn {
+  background: rgba(148, 163, 184, 0.15);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.mapper-add-cancel-btn:hover {
+  background: rgba(148, 163, 184, 0.2);
+  transform: translateY(-1px);
+}
+
+.mapper-short-editable {
+  min-width: 80px;
+  text-align: center;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(129, 140, 248, 0.5);
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.mapper-short-editable:focus {
+  border-color: rgba(129, 140, 248, 0.9);
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.3);
+}
+
+.mapper-delete-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  height: 16px;
+  width: 16px;
+  justify-content: center;
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.mapper-delete-btn:hover {
+  color: #dc2626;
+  transform: scale(1.3);
+}

@@ -6,12 +6,22 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
       short: a.short,
       full: a.full || "",
       type: a.type === "Practical" ? ["Practical"] : ["Theory"],
+      isNew: false,
     })),
   );
+  const [isAddingSubject, setIsAddingSubject] = useState(false);
+  const [newSubjectCode, setNewSubjectCode] = useState("");
+  const [newSubjectName, setNewSubjectName] = useState("");
 
   function updateFullName(index, value) {
     const updated = [...mapping];
     updated[index].full = value;
+    setMapping(updated);
+  }
+
+  function updateShortName(index, value) {
+    const updated = [...mapping];
+    updated[index].short = value;
     setMapping(updated);
   }
 
@@ -25,6 +35,28 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
     } else {
       updated[index].type = [...current, typeValue];
     }
+    setMapping(updated);
+  }
+
+  function handleAddSubject() {
+    if (!newSubjectCode.trim() || !newSubjectName.trim()) {
+      alert("Please enter both a code and a subject name.");
+      return;
+    }
+    const newEntry = {
+      short: newSubjectCode.trim(),
+      full: newSubjectName.trim(),
+      type: ["Theory"],
+      isNew: true,
+    };
+    setMapping([...mapping, newEntry]);
+    setNewSubjectCode("");
+    setNewSubjectName("");
+    setIsAddingSubject(false);
+  }
+
+  function handleDeleteSubject(index) {
+    const updated = mapping.filter((_, i) => i !== index);
     setMapping(updated);
   }
 
@@ -65,7 +97,17 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
       <div className="mapper-grid">
         {mapping.map((item, index) => (
           <div key={index} className="mapper-row">
-            <span className="mapper-short">{item.short}</span>
+            {item.isNew ? (
+              <input
+                className="mapper-short-editable"
+                type="text"
+                placeholder="Code"
+                value={item.short}
+                onChange={(e) => updateShortName(index, e.target.value)}
+              />
+            ) : (
+              <span className="mapper-short">{item.short}</span>
+            )}
             <span className="mapper-arrow">→</span>
 
             <input
@@ -94,7 +136,16 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
             </div>
 
             <span className="mapper-check">
-              {item.full.trim() ? (
+              {item.isNew ? (
+                <button
+                  type="button"
+                  className="mapper-delete-btn"
+                  onClick={() => handleDeleteSubject(index)}
+                  title="Delete this subject"
+                >
+                  ✕
+                </button>
+              ) : item.full.trim() ? (
                 item.type.includes("Theory") &&
                 item.type.includes("Practical") ? (
                   <span className="mapper-both-badge">Both</span>
@@ -108,6 +159,58 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
           </div>
         ))}
       </div>
+
+      {!isAddingSubject && (
+        <button
+          type="button"
+          className="mapper-add-subject-btn"
+          onClick={() => setIsAddingSubject(true)}
+        >
+          + Add More Subjects
+        </button>
+      )}
+
+      {isAddingSubject && (
+        <div className="mapper-add-subject-form">
+          <h4>Add a Subject</h4>
+          <div className="mapper-add-inputs">
+            <input
+              type="text"
+              placeholder="Subject Code (e.g., CS101)"
+              value={newSubjectCode}
+              onChange={(e) => setNewSubjectCode(e.target.value)}
+              className="mapper-add-code-input"
+            />
+            <input
+              type="text"
+              placeholder="Full Subject Name"
+              value={newSubjectName}
+              onChange={(e) => setNewSubjectName(e.target.value)}
+              className="mapper-add-name-input"
+            />
+          </div>
+          <div className="mapper-add-actions">
+            <button
+              type="button"
+              className="mapper-add-confirm-btn"
+              onClick={handleAddSubject}
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              className="mapper-add-cancel-btn"
+              onClick={() => {
+                setIsAddingSubject(false);
+                setNewSubjectCode("");
+                setNewSubjectName("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="tt-action-buttons" style={{ marginTop: 24 }}>
         <button className="tt-confirm-btn" onClick={handleConfirm}>
