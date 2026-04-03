@@ -8,7 +8,6 @@ const BACKEND_URL =
 function Timetable({ onSaved }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
-  const [subjectsText, setSubjectsText] = useState("");
   const [status, setStatus] = useState("");
   const [abbreviations, setAbbreviations] = useState([]);
   const [showMapper, setShowMapper] = useState(false);
@@ -30,34 +29,14 @@ function Timetable({ onSaved }) {
   function onSubmit(e) {
     e.preventDefault();
 
-    const manualSubjects = subjectsText.trim()
-      ? subjectsText
-          .trim()
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
-
-    if (!file && manualSubjects.length === 0) {
-      setStatus("Please upload a timetable image or enter subjects manually.");
+    if (!file) {
+      setStatus("Please upload a timetable image.");
       setStatusType("error");
       return;
     }
 
-    // User typed subjects manually — skip AI, save directly
-    if (manualSubjects.length > 0) {
-      const formatted = manualSubjects.map((name) => ({
-        full: name,
-        type: ["Theory"], // default type for manually entered subjects
-      }));
-      saveSubjectsToDB(formatted);
-      return;
-    }
-
     // User uploaded image — use AI detection
-    if (file) {
-      sendImageToBackend(file);
-    }
+    sendImageToBackend(file);
   }
 
   async function sendImageToBackend(imageFile) {
@@ -139,7 +118,6 @@ function Timetable({ onSaved }) {
       setStatusType("success");
       setFile(null);
       setPreview("");
-      setSubjectsText("");
       setAbbreviations([]);
 
       if (typeof onSaved === "function") {
@@ -193,25 +171,7 @@ function Timetable({ onSaved }) {
               />
             </div>
 
-            <div className="tt-field">
-              <label className="tt-label" htmlFor="tt-subjects">
-                Or type your subjects
-              </label>
-              <textarea
-                id="tt-subjects"
-                className="tt-textarea"
-                placeholder={
-                  "Example:\nMaths\nPhysics\nChemistry\nComputer Science"
-                }
-                value={subjectsText}
-                onChange={(e) => setSubjectsText(e.target.value)}
-                rows={5}
-              />
-              <p className="tt-help">
-                List each subject on a new line, or just upload a photo of your
-                timetable.
-              </p>
-            </div>
+
           </div>
 
           {preview && (
