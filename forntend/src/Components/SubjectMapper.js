@@ -97,17 +97,13 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
       <div className="mapper-grid">
         {mapping.map((item, index) => (
           <div key={index} className="mapper-row">
-            {item.isNew ? (
-              <input
-                className="mapper-short-editable"
-                type="text"
-                placeholder="Code"
-                value={item.short}
-                onChange={(e) => updateShortName(index, e.target.value)}
-              />
-            ) : (
-              <span className="mapper-short">{item.short}</span>
-            )}
+            <input
+              className="mapper-short-editable"
+              type="text"
+              placeholder="Code"
+              value={item.short}
+              onChange={(e) => updateShortName(index, e.target.value)}
+            />
             <span className="mapper-arrow">→</span>
 
             <input
@@ -136,25 +132,14 @@ export default function SubjectMapper({ abbreviations, onConfirm, onCancel }) {
             </div>
 
             <span className="mapper-check">
-              {item.isNew ? (
-                <button
-                  type="button"
-                  className="mapper-delete-btn"
-                  onClick={() => handleDeleteSubject(index)}
-                  title="Delete this subject"
-                >
-                  ✕
-                </button>
-              ) : item.full.trim() ? (
-                item.type.includes("Theory") &&
-                item.type.includes("Practical") ? (
-                  <span className="mapper-both-badge">Both</span>
-                ) : (
-                  "✓"
-                )
-              ) : (
-                ""
-              )}
+              <button
+                type="button"
+                className="mapper-delete-btn"
+                onClick={() => handleDeleteSubject(index)}
+                title="Delete this subject"
+              >
+                ✕
+              </button>
             </span>
           </div>
         ))}
