@@ -12,7 +12,7 @@ from attendance import get_timetable_week, get_todays_schedule, mark_attendance,
 
 load_dotenv()  
 
-app = Flask(__name__)
+app = Flask(__name__)   
 CORS(app)
 
 # In-memory user storage (no database)
