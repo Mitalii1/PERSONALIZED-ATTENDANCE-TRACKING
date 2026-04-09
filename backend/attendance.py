@@ -16,6 +16,68 @@ SLOT_TIMES = {
 DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
 
+def get_timetable_week_with_details(user_id: int) -> list:
+    """
+    Returns the full week timetable WITH subject details (type, id, time_slot).
+    Format:
+    [
+      {
+        "day": "Monday",
+        "s1": { "subject_name": "Java", "type": "Theory", "subject_id": 1, "time_slot": "8:15-10:15", "slot_key": "s1" },
+        "s2": { ... },
+        ...
+      },
+      ...
+    ]
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                ts.day_of_week,
+                ts.slot_key,
+                ts.time_slot,
+                s.id as subject_id,
+                s.subject_name,
+                s.type
+            FROM timetable_schedule ts
+            JOIN subjects s ON ts.subject_id = s.id
+            WHERE ts.user_id = %s
+            ORDER BY ts.day_of_week, FIELD(ts.slot_key, 's1', 's2', 's3', 'a1', 'a2')
+        """, (user_id,))
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Build the week structure with details
+        week = {}
+        for day in DAYS_ORDER:
+            week[day] = {
+                'day': day,
+                's1': None, 's2': None, 's3': None, 'a1': None, 'a2': None
+            }
+
+        for row in rows:
+            day      = row['day_of_week']
+            slot_key = row['slot_key']
+            if day in week and slot_key in week[day]:
+                week[day][slot_key] = {
+                    'subject_name': row['subject_name'],
+                    'type': row['type'],
+                    'subject_id': row['subject_id'],
+                    'time_slot': row['time_slot'],
+                    'slot_key': slot_key
+                }
+
+        return list(week.values())
+
+    except Exception as e:
+        raise Exception(f"Error fetching timetable with details: {str(e)}")
+
+
 def get_timetable_week(user_id: int) -> list:
     """
     Returns the full week timetable in the exact format the frontend expects:
