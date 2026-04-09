@@ -67,9 +67,12 @@ def extract_timetable():
     if ext not in allowed:
         return jsonify({"error": f"File type '{ext}' not supported."}), 400
 
+    # NEW: Get batch from form data
+    batch = request.form.get('batch', '').strip()
+
     try:
         image_bytes = file.read()
-        result = extract_subjects_from_image(image_bytes)
+        result = extract_subjects_from_image(image_bytes, batch)
         return jsonify({"success": True, "data": result}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
