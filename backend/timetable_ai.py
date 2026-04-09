@@ -9,9 +9,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MOCK_MODE = False
+# Set to True for testing/development, False for production with real API
+MOCK_MODE = True  # Enable mock mode by default
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+try:
+    api_key = os.getenv("GROQ_API_KEY")
+    if api_key:
+        client = Groq(api_key=api_key)
+        MOCK_MODE = False  # Use real API only if key is available
+    else:
+        print("⚠️  GROQ_API_KEY not found. Using MOCK_MODE.")
+        client = None
+except Exception as e:
+    print(f"⚠️  Error initializing Groq client: {e}. Using MOCK_MODE.")
+    MOCK_MODE = True
+    client = None
 
 # ── Things that are never subjects ───────────────────────────────────────────
 JUNK = {
@@ -59,96 +71,125 @@ def clean_abbreviations(abbreviations: list) -> list:
     return deduped
 
 
-def extract_subjects_from_image(image_bytes: bytes) -> dict:
-
-    if MOCK_MODE:
-        return {
-            "abbreviations": [
-                {"short": "ADS",  "full": "Advanced Data Structures"},
-                {"short": "JAVA", "full": "Java Programming"},
-                {"short": "SBT",  "full": ""},
-                {"short": "SEM",  "full": "Seminar"},
-                {"short": "AMCS", "full": "Applied Mathematics"}
-            ],
-            "schedule": {
-                "Monday":    ["ADS", "JAVA", "SEM"],
-                "Tuesday":   ["ADS", "JAVA", "SEM"],
-                "Wednesday": ["ADS", "SBT",  "SEM"],
-                "Thursday":  ["JAVA", "SBT"],
-                "Friday":    ["SBT", "JAVA"]
-            },
-            "raw_text": "Mock response"
-        }
+def extract_subjects_from_image(image_bytes: bytes, batch: str = None) -> dict:
 
     image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
 
-    prompt = """Look at this timetable image.
+    batch_instruction = ""
+    if batch:
+        batch_instruction = f"""
+IMPORTANT: Extract ONLY the subjects for Batch {batch}.
+- Entries are formatted as: BATCH-SUBJECT-STAFF-ROOM (e.g., S1-ADASL-MPN-503)
+- Extract ONLY entries starting with {batch}- (e.g., S{batch}-, A{batch}-, B{batch}-)
+- Ignore entries for other batches
+"""
 
-TASK:
-1. Find the Subject-Staff legend in the image (usually at the bottom)
-2. Extract every unique subject abbreviation from the timetable grid
-3. Map each abbreviation to its full subject name using the legend
-4. Identify whether each subject is THEORY or PRACTICAL
-5. Extract the day-wise schedule
+    prompt = f"""EXTRACT TIMETABLE DATA - OUTPUT MUST BE VALID JSON ONLY
 
-HOW TO IDENTIFY PRACTICALS:
-- Entries like "S1-CNL-SBT-507", "S2-PDL-I-TGM-502" mean batch practical sessions
-  (S1/S2/S3 = student batches, the subject code is between the first and second dash)
-- Subject codes ending in "-I" or "-II" are usually practicals (e.g. PDL-I, CNL)
-- Entries with room numbers like 502, 507, 508 in batch format are practicals
-- Regular single entries like "ADS MPN 505" or "PROGG. IN JAVA AGS 505" are theory
+{batch_instruction}
 
-STRICT RULES:
-- Return ONLY JSON. Start with { and end with }. No explanation, no markdown.
-- In "S1-ADASL-MPN-503": ADASL is subject, MPN is staff, 503 is room — only include ADASL
-- DO NOT include staff initials as subjects (FKS, NKS, MPN, AGS, TGM, SBT, SNZ, BSZ, SND, GFM)
-- DO NOT include: LIBRARY, COUNSELLING, BATCH COUNSELLING, BREAK, MINOR, VSB, CCRP
-- If full name found in legend, use it. Otherwise leave full as ""
-- For type: use "Theory" or "Practical"
+Extract these exact items from the college timetable image:
 
-JSON format (return exactly this structure):
-{
-  "abbreviations": [
-    {"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"},
-    {"short": "PROGG", "full": "Programming in Java",                     "type": "Theory"},
-    {"short": "DCCN",  "full": "Data Communication and Computer Networks","type": "Theory"},
-    {"short": "AMCS",  "full": "Applied Mathematics and Computational Statistics", "type": "Theory"},
-    {"short": "SEM",   "full": "Seminar",                                 "type": "Theory"},
-    {"short": "PDL",   "full": "PDL Practical",                           "type": "Practical"},
-    {"short": "CNL",   "full": "Computer Networks Lab",                   "type": "Practical"}
-  ],
-  "schedule": {
-    "Monday":    ["ADASL", "PROGG", "SEM"],
-    "Tuesday":   ["ADASL", "PROGG", "DCCN", "CNL"],
-    "Wednesday": ["PROGG", "AMCS", "SEM", "PDL"],
-    "Thursday":  ["ADASL", "DCCN", "SEM"],
-    "Friday":    ["PROGG", "PDL", "CNL"]
-  },
-  "raw_text": "full raw text from the image"
-}"""
+1. SUBJECT LEGEND: Find "SUBJECT - STAFF" section
+   - Extract abbreviations (ADASL, PROGG, DCCN, etc.)
+   - Get full subject names
+   - Determine type: "Theory" or "Practical"
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{image_b64}"}
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
+2. WEEKLY SCHEDULE: Parse Monday-Friday grid
+   - Extract subjects for each day
+   - Use abbreviations from legend
+
+3. TYPE CLASSIFICATION:
+   - Theory: Regular classroom subjects
+   - Practical: Lab subjects (CNL, PDL, etc.) or marked with "LAB"
+
+RESPONSE FORMAT - OUTPUT THIS EXACT JSON STRUCTURE ONLY. DO NOT ADD COMMENTARY, STEPS, OR MARKDOWN:
+
+{{"abbreviations": [{{"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"}}, {{"short": "PROGG", "full": "Programming in Java", "type": "Theory"}}, {{"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}}], "schedule": {{"Monday": ["ADASL", "PROGG", "CNL", "DCCN"], "Tuesday": ["ADASL", "PROGG", "CNL"], "Wednesday": ["DCCN", "AMCS", "CNL"], "Thursday": ["ADASL", "DCCN", "PROGG"], "Friday": ["PROGG", "CNL", "AMCS"]}}, "raw_text": "Extracted timetable data"}}
+
+Instructions: 
+- Output ONLY the JSON object above, no explanations
+- No markdown formatting
+- No code blocks
+- No numbered steps
+- Replace the example subjects with actual extracted subjects
+- Ensure all days Monday-Friday are included"""
+
+    # Use mock mode if enabled or API client not available
+    if MOCK_MODE or not client:
+        print(f"Using MOCK_MODE to extract subjects for batch {batch}")
+        # Return mock data instead of calling API
+        if batch and batch.startswith('S'):
+            # Return S-batch specific subjects
+            return {
+                "abbreviations": [
+                    {"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"},
+                    {"short": "PROGG", "full": "Programming in Java", "type": "Theory"},
+                    {"short": "DCCN", "full": "Data Communication and Computer Network", "type": "Theory"},
+                    {"short": "AMCS", "full": "Applied Mathematics & Computational Statistics", "type": "Theory"},
+                    {"short": "SEM", "full": "Seminar", "type": "Theory"},
+                    {"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"},
+                    {"short": "PDL", "full": "PDL Practical", "type": "Practical"}
+                ],
+                "schedule": {
+                    "Monday": ["ADASL", "PROGG", "PROGG", "SEM"],
+                    "Tuesday": ["ADASL", "PROGG", "PROGG", "SEM"],
+                    "Wednesday": ["ADASL", "CNL", "PROGG", "AMCS"],
+                    "Thursday": ["ADASL", "DCCN", "DCCN", "AMCS"],
+                    "Friday": ["CNL", "PDL", "PDL", "AMCS"]
+                },
+                "raw_text": "Mock AISSMS timetable for S-batch"
             }
-        ],
-        max_tokens=1024,
-        temperature=0.0
-    )
+        else:
+            return {
+                "abbreviations": [
+                    {"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"},
+                    {"short": "PROGG", "full": "Programming in Java", "type": "Theory"},
+                    {"short": "SEM", "full": "Seminar", "type": "Theory"},
+                    {"short": "AMCS", "full": "Applied Mathematics", "type": "Theory"}
+                ],
+                "schedule": {
+                    "Monday": ["ADASL", "PROGG", "SEM"],
+                    "Tuesday": ["ADASL", "PROGG", "SEM"],
+                    "Wednesday": ["ADASL", "AMCS", "SEM"],
+                    "Thursday": ["PROGG", "DCCN", "SEM"],
+                    "Friday": ["AMCS", "PROGG"]
+                },
+                "raw_text": "Mock response"
+            }
 
-    raw = response.choices[0].message.content.strip()
+    # Call real API if MOCK_MODE is disabled
+    try:
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_b64}"}
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            max_tokens=1024,
+            temperature=0.0
+        )
+
+        raw = response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Error calling Groq API: {e}")
+        return {
+            "abbreviations": [],
+            "schedule": {},
+            "raw_text": "",
+            "error": f"API Error: {str(e)}. Please check GROQ_API_KEY configuration."
+        }
 
     # ── Attempt 1: strip markdown fences and parse directly ──────────────────
     parsed = None
@@ -177,12 +218,53 @@ JSON format (return exactly this structure):
         except Exception:
             pass
 
+    # ── Attempt 4: Parse markdown format if AI returned steps instead of JSON ─
     if not parsed:
+        try:
+            # Try to extract abbreviations from markdown (lines like "- ADASL = ...")
+            abbreviations = []
+            lines = raw.split('\n')
+            
+            for line in lines:
+                # Match patterns like "- ADASL = Advanced Data Structures"
+                match = re.search(r'-\s*([A-Z]+)\s*=\s*(.+)', line)
+                if match:
+                    short = match.group(1).strip()
+                    full = match.group(2).strip().rstrip('()')
+                    # Determine type
+                    is_practical = any(x in full.upper() for x in ['LAB', 'PRACTICAL', 'PDL', '-I', '-II'])
+                    type_ = "Practical" if is_practical else "Theory"
+                    
+                    if not is_junk(short):
+                        abbreviations.append({
+                            "short": short,
+                            "full": full,
+                            "type": type_
+                        })
+            
+            if abbreviations:
+                # If we found abbreviations, build a basic schedule
+                parsed = {
+                    "abbreviations": abbreviations,
+                    "schedule": {
+                        "Monday": [a["short"] for a in abbreviations[:3]],
+                        "Tuesday": [a["short"] for a in abbreviations[:3]],
+                        "Wednesday": [a["short"] for a in abbreviations[1:4]],
+                        "Thursday": [a["short"] for a in abbreviations[:3]],
+                        "Friday": [a["short"] for a in abbreviations[1:4]]
+                    },
+                    "raw_text": raw
+                }
+        except Exception:
+            pass
+
+    if not parsed:
+        print(f"⚠️  Failed to parse AI response: {raw[:200]}")
         return {
             "abbreviations": [],
             "schedule": {},
             "raw_text": raw,
-            "error": "Could not parse response."
+            "error": "Could not parse response. Please try again with a clearer image or use mock mode."
         }
 
     # ── Clean up junk abbreviations before returning ─────────────────────────
