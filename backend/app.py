@@ -8,7 +8,7 @@ import io
 import re
 from werkzeug.utils import secure_filename
 from db import get_connection
-from attendance import get_timetable_week, get_todays_schedule, mark_attendance, get_attendance_summary
+from attendance import get_timetable_week, get_timetable_week_with_details, get_todays_schedule, mark_attendance, get_attendance_summary
 
 load_dotenv()  
 
@@ -194,6 +194,28 @@ def timetable_week(user_id):
     """
     try:
         week = get_timetable_week(user_id)
+        return jsonify({"success": True, "week": week}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Get timetable with subject details ─────────────────────────────────────
+@app.route('/api/timetable/week-details/<int:user_id>', methods=['GET'])
+def timetable_week_details(user_id):
+    """
+    Returns full week with subject details (type, id, time_slot):
+    [
+      {
+        "day": "Monday",
+        "s1": { "subject_name": "Java", "type": "Theory", "subject_id": 1, "time_slot": "8:15-10:15" },
+        "s2": { ... },
+        ...
+      },
+      ...
+    ]
+    """
+    try:
+        week = get_timetable_week_with_details(user_id)
         return jsonify({"success": True, "week": week}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

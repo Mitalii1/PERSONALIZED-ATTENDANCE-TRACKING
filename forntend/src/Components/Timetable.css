@@ -371,6 +371,150 @@
   transform: translateY(0);
 }
 
+/* ── Batch Dialog ──────────────────────────────────────────────────────────── */
+
+.tt-batch-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 200ms ease;
+}
+
+.tt-batch-dialog {
+  background: radial-gradient(circle at top right, rgba(15, 23, 42, 0.98), #020617);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 18px;
+  padding: 28px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  animation: slideUp 300ms ease;
+}
+
+.tt-batch-title {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f0f9ff;
+  text-align: center;
+}
+
+.tt-batch-subtitle {
+  margin: 0 0 20px 0;
+  font-size: 13px;
+  color: #cbd5e1;
+  text-align: center;
+}
+
+.tt-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tt-batch-btn {
+  padding: 12px 8px;
+  border: 2px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.7);
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 150ms ease;
+}
+
+.tt-batch-btn:hover {
+  border-color: rgba(148, 163, 184, 0.7);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.tt-batch-btn-active {
+  border-color: #06b6d4;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(6, 182, 212, 0.15));
+  color: #06f6d6;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);
+}
+
+.tt-batch-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.tt-batch-confirm-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0891b2, #06b6d4);
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.tt-batch-confirm-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.tt-batch-confirm-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.tt-batch-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tt-batch-cancel-btn {
+  padding: 10px 20px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 8px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.tt-batch-cancel-btn:hover {
+  border-color: rgba(148, 163, 184, 0.8);
+  background: rgba(148, 163, 184, 0.1);
+  transform: translateY(-1px);
+}
+
+.tt-batch-cancel-btn:active {
+  transform: translateY(0);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Subject Mapper ────────────────────────────────────────────────────────── */
 
 .mapper-section {
