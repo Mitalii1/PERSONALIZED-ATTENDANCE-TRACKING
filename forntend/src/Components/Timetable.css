@@ -4,7 +4,12 @@
   align-items: center;
   justify-content: center;
   padding: clamp(12px, 2.2vw, 24px);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   background: radial-gradient(circle at top left, #020617, #0b1120);
   color: #e5e7eb;
 }
@@ -13,7 +18,11 @@
   width: min(1100px, 96vw);
   border-radius: 26px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: radial-gradient(circle at top right, rgba(15, 23, 42, 0.96), #020617);
+  background: radial-gradient(
+    circle at top right,
+    rgba(15, 23, 42, 0.96),
+    #020617
+  );
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.9);
   padding: clamp(18px, 2.4vw, 28px);
   display: flex;
@@ -109,12 +118,19 @@
   border-radius: 14px;
   border: 1px dashed rgba(148, 163, 184, 0.7);
   padding: 18px 14px;
-  background: radial-gradient(circle at top left, rgba(30, 64, 175, 0.25), rgba(15, 23, 42, 0.9));
+  background: radial-gradient(
+    circle at top left,
+    rgba(30, 64, 175, 0.25),
+    rgba(15, 23, 42, 0.9)
+  );
   display: flex;
   flex-direction: column;
   gap: 4px;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 140ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 140ms ease;
 }
 
 .tt-dropzone:hover {
@@ -140,7 +156,11 @@
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.45);
   padding: 10px 10px 12px;
-  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.98));
+  background: radial-gradient(
+    circle at top,
+    rgba(15, 23, 42, 0.96),
+    rgba(15, 23, 42, 0.98)
+  );
 }
 
 .tt-preview-label {
@@ -182,7 +202,10 @@
   color: #f9fafb;
   background: radial-gradient(circle at top left, #6366f1, #4f46e5);
   box-shadow: 0 14px 30px rgba(79, 70, 229, 0.5);
-  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease;
 }
 
 .tt-primary:hover {
@@ -215,13 +238,23 @@
   padding: 16px;
   border-radius: 14px;
   border: 1px solid rgba(76, 175, 80, 0.5);
-  background: radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.95));
+  background: radial-gradient(
+    circle at top right,
+    rgba(34, 197, 94, 0.08),
+    rgba(15, 23, 42, 0.95)
+  );
   animation: slideIn 300ms ease;
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to   { opacity: 1; transform: translateY(0);     }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tt-detection-title {
@@ -269,7 +302,9 @@
   display: flex;
   align-items: center;
   height: 16px;
-  transition: color 140ms ease, transform 140ms ease;
+  transition:
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .tt-remove-btn:hover {
@@ -313,7 +348,9 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: background 140ms ease, transform 140ms ease;
+  transition:
+    background 140ms ease,
+    transform 140ms ease;
 }
 
 .tt-add-btn:hover {
@@ -336,7 +373,10 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  transition: background 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  transition:
+    background 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .tt-confirm-btn:hover {
@@ -358,7 +398,10 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
 }
 
 .tt-cancel-btn:hover {
@@ -389,7 +432,11 @@
 }
 
 .tt-batch-dialog {
-  background: radial-gradient(circle at top right, rgba(15, 23, 42, 0.98), #020617);
+  background: radial-gradient(
+    circle at top right,
+    rgba(15, 23, 42, 0.98),
+    #020617
+  );
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 18px;
   padding: 28px;
@@ -440,7 +487,11 @@
 
 .tt-batch-btn-active {
   border-color: #06b6d4;
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(6, 182, 212, 0.15));
+  background: linear-gradient(
+    135deg,
+    rgba(6, 182, 212, 0.25),
+    rgba(6, 182, 212, 0.15)
+  );
   color: #06f6d6;
   box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);
 }
@@ -460,7 +511,9 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  transition: opacity 140ms ease, transform 140ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .tt-batch-confirm-btn:hover:not(:disabled) {
@@ -486,7 +539,10 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
 }
 
 .tt-batch-cancel-btn:hover {
@@ -500,8 +556,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
@@ -555,9 +615,16 @@
   margin-bottom: 8px;
 }
 
-.mapper-header-code  { min-width: 80px; }
-.mapper-header-name  { flex: 1; }
-.mapper-header-type  { width: 170px; flex-shrink: 0; }
+.mapper-header-code {
+  min-width: 80px;
+}
+.mapper-header-name {
+  flex: 1;
+}
+.mapper-header-type {
+  width: 170px;
+  flex-shrink: 0;
+}
 
 .mapper-grid {
   display: flex;
@@ -599,7 +666,9 @@
   color: #e5e7eb;
   font-size: 13px;
   outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .mapper-input:focus {
@@ -640,7 +709,9 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 
 .type-btn:hover {
@@ -726,8 +797,12 @@
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 6px;
-  background: linear-gradient(90deg, rgba(99,102,241,0.3), rgba(34,197,94,0.3));
-  border: 1px solid rgba(99,102,241,0.4);
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.3),
+    rgba(34, 197, 94, 0.3)
+  );
+  border: 1px solid rgba(99, 102, 241, 0.4);
   color: #c4b5fd;
   white-space: nowrap;
 }
@@ -744,7 +819,10 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
   width: 100%;
 }
 
@@ -789,7 +867,9 @@
   color: #e5e7eb;
   font-size: 13px;
   outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .mapper-add-code-input {
@@ -825,7 +905,9 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 140ms ease, transform 140ms ease;
+  transition:
+    background 140ms ease,
+    transform 140ms ease;
 }
 
 .mapper-add-confirm-btn {
@@ -861,7 +943,9 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
   cursor: text;
 }
 
@@ -882,7 +966,9 @@
   height: 16px;
   width: 16px;
   justify-content: center;
-  transition: color 140ms ease, transform 140ms ease;
+  transition:
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .mapper-delete-btn:hover {

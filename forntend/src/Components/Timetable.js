@@ -14,11 +14,22 @@ function Timetable({ onSaved }) {
   const [showMapper, setShowMapper] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [statusType, setStatusType] = useState("success");
-  
+
   // NEW: Batch input state
   const [showBatchInput, setShowBatchInput] = useState(false);
   const [batch, setBatch] = useState("");
-  const [allBatches] = useState(["S1", "S2", "S3", "S4", "S5", "S6", "A1", "A2", "B1", "B2"]);
+  const [allBatches] = useState([
+    "S1",
+    "S2",
+    "S3",
+    "S4",
+    "S5",
+    "S6",
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+  ]);
 
   function onFileChange(e) {
     const selected = e.target.files?.[0];
@@ -79,7 +90,9 @@ function Timetable({ onSaved }) {
         setStatus("");
       } else {
         setStatus(
-          "No subjects detected for batch " + batch + ". Please enter them manually or try a clearer image.",
+          "No subjects detected for batch " +
+            batch +
+            ". Please enter them manually or try a clearer image.",
         );
         setStatusType("error");
       }
@@ -93,39 +106,47 @@ function Timetable({ onSaved }) {
   }
 
   async function saveSubjectsToDB(subjects) {
-    setIsLoading(true);
-    setStatus("Saving subjects locally...");
-    setStatusType("success");
+  setIsLoading(true);
+  setStatus("Saving subjects to database...");
+  setStatusType("success");
 
-    try {
-      // DEACTIVATED: Database saving is disabled
-      // Instead, store subjects locally in localStorage
-      const localData = {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/timetable/save-subjects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: 1,        // 🔴 replace with real user_id later
         subjects: subjects,
-        schedule: schedule,
-        savedAt: new Date().toISOString(),
-      };
-      
-      localStorage.setItem('pat_subjects', JSON.stringify(localData));
-      
-      // Success — reset the form
-      setStatus(`✅ Subjects saved locally (database disabled)`);
-      setStatusType("success");
-      setFile(null);
-      setPreview("");
-      setAbbreviations([]);
-      setSchedule({});
+        schedule: schedule // ← this is already in state from the AI response
+      }),
+    });
 
-      if (typeof onSaved === "function") {
-        onSaved(subjects);
-      }
-    } catch (error) {
-      setStatus(`Error saving locally: ${error.message}`);
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      setStatus(`Error saving: ${data.error || "Something went wrong."}`);
       setStatusType("error");
-    } finally {
-      setIsLoading(false);
+      return;
     }
+
+    setStatus(`✅ ${data.message}`);
+    setStatusType("success");
+    setFile(null);
+    setPreview("");
+    setAbbreviations([]);
+    setSchedule({});
+
+    if (typeof onSaved === "function") {
+      onSaved(subjects);
+    }
+
+  } catch (error) {
+    setStatus(`Could not reach server: ${error.message}`);
+    setStatusType("error");
+  } finally {
+    setIsLoading(false);
   }
+}
 
   async function handleMapperConfirm(confirmedMapping) {
     setShowMapper(false); // hide the mapper
@@ -166,8 +187,6 @@ function Timetable({ onSaved }) {
                 className="tt-file-input"
               />
             </div>
-
-
           </div>
 
           {preview && (
@@ -185,14 +204,15 @@ function Timetable({ onSaved }) {
               <div className="tt-batch-dialog">
                 <h3 className="tt-batch-title">Select Your Batch</h3>
                 <p className="tt-batch-subtitle">
-                  Choose your batch to extract the correct timetable and subjects.
+                  Choose your batch to extract the correct timetable and
+                  subjects.
                 </p>
                 <div className="tt-batch-grid">
                   {allBatches.map((batchOption) => (
                     <button
                       key={batchOption}
                       type="button"
-                      className={`tt-batch-btn ${batch === batchOption ? 'tt-batch-btn-active' : ''}`}
+                      className={`tt-batch-btn ${batch === batchOption ? "tt-batch-btn-active" : ""}`}
                       onClick={() => setBatch(batchOption)}
                     >
                       {batchOption}
@@ -229,7 +249,11 @@ function Timetable({ onSaved }) {
           )}
           {/* END Batch Input Dialog */}
 
-          <button type="submit" className="tt-primary" disabled={isLoading || showBatchInput}>
+          <button
+            type="submit"
+            className="tt-primary"
+            disabled={isLoading || showBatchInput}
+          >
             {isLoading ? "Processing..." : "Save timetable details"}
           </button>
 

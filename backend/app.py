@@ -8,15 +8,22 @@ import io
 import re
 from werkzeug.utils import secure_filename
 from db import get_connection
-from attendance import get_timetable_week, get_timetable_week_with_details, get_todays_schedule, mark_attendance, get_attendance_summary
+from attendance import (
+    get_timetable_week,
+    get_timetable_week_with_details,
+    get_todays_schedule,
+    mark_attendance,
+    get_attendance_summary,
+)
 
-load_dotenv()  
+load_dotenv()
 
-app = Flask(__name__)   
+app = Flask(__name__)
 CORS(app)
 
 # In-memory user storage (no database)
 users = {}
+
 
 @app.route("/")
 def home():
@@ -53,22 +60,23 @@ def login():
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
-@app.route('/api/timetable/extract', methods=['POST'])
+
+@app.route("/api/timetable/extract", methods=["POST"])
 def extract_timetable():
-    if 'image' not in request.files:
+    if "image" not in request.files:
         return jsonify({"error": "No image file provided"}), 400
 
-    file = request.files['image']
-    if file.filename == '':
+    file = request.files["image"]
+    if file.filename == "":
         return jsonify({"error": "Empty filename"}), 400
 
-    allowed = {'png', 'jpg', 'jpeg', 'webp'}
-    ext = file.filename.rsplit('.', 1)[-1].lower()
+    allowed = {"png", "jpg", "jpeg", "webp"}
+    ext = file.filename.rsplit(".", 1)[-1].lower()
     if ext not in allowed:
         return jsonify({"error": f"File type '{ext}' not supported."}), 400
 
     # NEW: Get batch from form data
-    batch = request.form.get('batch', '').strip()
+    batch = request.form.get("batch", "").strip()
 
     try:
         image_bytes = file.read()
@@ -76,6 +84,7 @@ def extract_timetable():
         return jsonify({"success": True, "data": result}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route('/api/timetable/save-subjects', methods=['POST'])
 def save_subjects():
@@ -95,8 +104,8 @@ def save_subjects():
         cursor.execute("DELETE FROM timetable_schedule WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM subjects WHERE user_id = %s", (user_id,))
 
-        # Insert subjects, store id by short code
-        subject_id_map = {}
+        # Insert subjects, map short code → DB id
+        subject_id_map = {}  # { "ADASL": 1, "PROGG": 2, ... }
 
         for subject in subjects:
             name  = subject.get('full', '').strip()
@@ -119,9 +128,12 @@ def save_subjects():
                 VALUES (%s, %s, %s, 0, 0)
             """, (user_id, name, type_str))
 
-            subject_id_map[short] = cursor.lastrowid
+            # Map both short code and full name → subject_id
+            subject_id_map[short.upper()] = cursor.lastrowid
+            subject_id_map[name.upper()]  = cursor.lastrowid
 
-        # Slot key to time label
+        # Slot keys in order
+        slot_keys = ['s1', 's2', 's3', 'a1', 'a2']
         slot_times = {
             's1': '8:15-10:15',
             's2': '10:30-11:30',
@@ -131,16 +143,20 @@ def save_subjects():
         }
 
         # Insert schedule
-        # schedule from frontend looks like:
-        # { "Monday": ["ADASL", "PROGG", "SEM"], "Tuesday": [...] }
+        # schedule = { "Monday": ["ADASL", "PROGG", "SEM", "AMCS"], ... }
         for day, subject_list in schedule.items():
-            slot_keys = ['s1', 's2', 's3', 'a1', 'a2']
             for i, short in enumerate(subject_list):
                 if i >= len(slot_keys):
                     break
-                slot_key   = slot_keys[i]
-                time_slot  = slot_times[slot_key]
-                subject_id = subject_id_map.get(short)
+
+                slot_key  = slot_keys[i]
+                time_slot = slot_times[slot_key]
+
+                # Try to find subject_id by short code or full name
+                subject_id = (
+                    subject_id_map.get(short.upper()) or
+                    subject_id_map.get(short.strip().upper())
+                )
 
                 if subject_id:
                     cursor.execute("""
@@ -148,6 +164,8 @@ def save_subjects():
                             (user_id, subject_id, day_of_week, slot_key, time_slot)
                         VALUES (%s, %s, %s, %s, %s)
                     """, (user_id, subject_id, day, slot_key, time_slot))
+                else:
+                    print(f"⚠️ Could not find subject_id for: {short}")
 
         conn.commit()
         cursor.close()
@@ -161,21 +179,26 @@ def save_subjects():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 # ── Get subjects for a user ───────────────────────────────────────────────────
 
-@app.route('/api/subjects/<int:user_id>', methods=['GET'])
+
+@app.route("/api/subjects/<int:user_id>", methods=["GET"])
 def get_subjects(user_id):
     """Returns all subjects for a given user."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, subject_name, type, total_classes, attended_classes
             FROM subjects
             WHERE user_id = %s
             ORDER BY subject_name
-        """, (user_id,))
+        """,
+            (user_id,),
+        )
 
         subjects = cursor.fetchall()
         cursor.close()
@@ -186,7 +209,8 @@ def get_subjects(user_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/timetable/week/<int:user_id>', methods=['GET'])
+
+@app.route("/api/timetable/week/<int:user_id>", methods=["GET"])
 def timetable_week(user_id):
     """
     Returns full week in format frontend expects:
@@ -203,7 +227,7 @@ def timetable_week(user_id):
 
 
 # ── Get timetable with subject details ─────────────────────────────────────
-@app.route('/api/timetable/week-details/<int:user_id>', methods=['GET'])
+@app.route("/api/timetable/week-details/<int:user_id>", methods=["GET"])
 def timetable_week_details(user_id):
     """
     Returns full week with subject details (type, id, time_slot):
@@ -225,7 +249,7 @@ def timetable_week_details(user_id):
 
 
 # ── Get today's schedule ──────────────────────────────────────────────────────
-@app.route('/api/attendance/today/<int:user_id>', methods=['GET'])
+@app.route("/api/attendance/today/<int:user_id>", methods=["GET"])
 def todays_schedule(user_id):
     try:
         today = get_todays_schedule(user_id)
@@ -235,7 +259,7 @@ def todays_schedule(user_id):
 
 
 # ── Mark attendance ───────────────────────────────────────────────────────────
-@app.route('/api/attendance/mark', methods=['POST'])
+@app.route("/api/attendance/mark", methods=["POST"])
 def mark_student_attendance():
     """
     Expected JSON:
@@ -247,9 +271,9 @@ def mark_student_attendance():
       ]
     }
     """
-    data    = request.get_json()
-    user_id = data.get('user_id')
-    records = data.get('records', [])
+    data = request.get_json()
+    user_id = data.get("user_id")
+    records = data.get("records", [])
 
     if not user_id:
         return jsonify({"success": False, "error": "user_id is required"}), 400
@@ -258,22 +282,25 @@ def mark_student_attendance():
 
     try:
         saved = mark_attendance(user_id, records)
-        return jsonify({
-            "success": True,
-            "message": f"Attendance marked for {saved} classes"
-        }), 200
+        return (
+            jsonify(
+                {"success": True, "message": f"Attendance marked for {saved} classes"}
+            ),
+            200,
+        )
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ── Attendance summary ────────────────────────────────────────────────────────
-@app.route('/api/attendance/summary/<int:user_id>', methods=['GET'])
+@app.route("/api/attendance/summary/<int:user_id>", methods=["GET"])
 def attendance_summary(user_id):
     try:
         summary = get_attendance_summary(user_id)
         return jsonify({"success": True, "summary": summary}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
