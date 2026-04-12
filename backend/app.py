@@ -86,6 +86,65 @@ def extract_timetable():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+import re
+
+# Entries to skip — not real subjects
+SKIP_ENTRIES = {
+    'LIBRARY', 'COUNSELLING', 'BATCH', 'MINOR', 'CCRP',
+    'VSB', 'BREAK', 'LUNCH', 'DT', 'SNZ', 'BSZ', 'SND',
+    'GFM', 'FKS', 'NKS', 'MPN', 'AGS', 'TGM', 'SBT'
+}
+
+def should_skip(entry: str) -> bool:
+    """Return True if this entry is not a real subject."""
+    entry = entry.strip()
+    # Remove batch prefix if present
+    batch_match = re.match(r'^[A-Z]\d+[-\s](.+)', entry)
+    if batch_match:
+        first_word = batch_match.group(1).split('-')[0].split()[0].upper()
+    else:
+        first_word = entry.split()[0].upper()
+    return first_word in SKIP_ENTRIES
+
+def parse_abbreviation(entry: str) -> str:
+    """
+    Extract subject abbreviation from raw timetable entry.
+
+    Batch-specific practicals (s1 slot):
+      "S1-ADASL-MPN-503"         → "ADASL"
+      "S1-PROGG IN JAVA-AGS-508" → "PROGG"
+      "S1-CNL-SBT-507"           → "CNL"
+      "S1-PDL-I-TGM-502"         → "PDL"
+
+    Shared theory entries (s2,s3,a1,a2 slots):
+      "PROGG IN JAVA AGS 505"    → "PROGG"
+      "ADS MPN 505"              → "ADS"
+      "DCCN SBT 505"             → "DCCN"
+      "SEM SNZ 505"              → "SEM"
+      "AMCS NKS 505"             → "AMCS"
+    """
+    entry = entry.strip()
+
+    # Remove batch prefix: "S1-", "S2-", "S3-"
+    batch_match = re.match(r'^[S][123][-\s](.+)', entry)
+    if batch_match:
+        rest = batch_match.group(1)
+        # "PROGG IN JAVA-AGS-508" → split by dash → "PROGG IN JAVA"
+        # "ADASL-MPN-503"         → split by dash → "ADASL"
+        parts = rest.split('-')
+        subject_part = parts[0].strip()
+        # First word is the abbreviation
+        abbreviation = subject_part.split()[0].upper()
+    else:
+        # Shared theory entry: "PROGG IN JAVA AGS 505" → first word
+        abbreviation = entry.split()[0].upper()
+
+    # Clean: PDL-I → PDL
+    abbreviation = re.sub(r'[-]?I+$', '', abbreviation).strip()
+
+    return abbreviation
+
+
 @app.route('/api/timetable/save-subjects', methods=['POST'])
 def save_subjects():
     data     = request.get_json()
@@ -100,12 +159,11 @@ def save_subjects():
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Clear old data
         cursor.execute("DELETE FROM timetable_schedule WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM subjects WHERE user_id = %s", (user_id,))
 
-        # Insert subjects, map short code → DB id
-        subject_id_map = {}  # { "ADASL": 1, "PROGG": 2, ... }
+        # Insert subjects — map short code AND full name → subject_id
+        subject_id_map = {}
 
         for subject in subjects:
             name  = subject.get('full', '').strip()
@@ -128,12 +186,14 @@ def save_subjects():
                 VALUES (%s, %s, %s, 0, 0)
             """, (user_id, name, type_str))
 
-            # Map both short code and full name → subject_id
-            subject_id_map[short.upper()] = cursor.lastrowid
-            subject_id_map[name.upper()]  = cursor.lastrowid
+            new_id = cursor.lastrowid
+            subject_id_map[short.upper()] = new_id
+            subject_id_map[name.upper()]  = new_id
 
-        # Slot keys in order
-        slot_keys = ['s1', 's2', 's3', 'a1', 'a2']
+        # Slot definitions
+        # s1 = practical slot (8:15-10:15)
+        # s2, s3, a1, a2 = theory slots
+        slot_keys  = ['s1', 's2', 's3', 'a1', 'a2']
         slot_times = {
             's1': '8:15-10:15',
             's2': '10:30-11:30',
@@ -142,21 +202,27 @@ def save_subjects():
             'a2': '2:15-3:15',
         }
 
-        # Insert schedule
-        # schedule = { "Monday": ["ADASL", "PROGG", "SEM", "AMCS"], ... }
+        # Save schedule day by day
         for day, subject_list in schedule.items():
-            for i, short in enumerate(subject_list):
-                if i >= len(slot_keys):
+            slot_index = 0  # which slot we are filling
+
+            for raw_entry in subject_list:
+                if slot_index >= len(slot_keys):
                     break
 
-                slot_key  = slot_keys[i]
+                # Skip junk entries but still advance slot
+                if should_skip(raw_entry):
+                    slot_index += 1
+                    continue
+
+                slot_key  = slot_keys[slot_index]
                 time_slot = slot_times[slot_key]
 
-                # Try to find subject_id by short code or full name
-                subject_id = (
-                    subject_id_map.get(short.upper()) or
-                    subject_id_map.get(short.strip().upper())
-                )
+                # Parse abbreviation
+                abbreviation = parse_abbreviation(raw_entry)
+
+                # Look up subject_id
+                subject_id = subject_id_map.get(abbreviation)
 
                 if subject_id:
                     cursor.execute("""
@@ -164,8 +230,11 @@ def save_subjects():
                             (user_id, subject_id, day_of_week, slot_key, time_slot)
                         VALUES (%s, %s, %s, %s, %s)
                     """, (user_id, subject_id, day, slot_key, time_slot))
+                    slot_index += 1
                 else:
-                    print(f"⚠️ Could not find subject_id for: {short}")
+                    print(f"⚠️ No match for: '{raw_entry}' → '{abbreviation}'")
+                    print(f"   Available: {list(subject_id_map.keys())}")
+                    slot_index += 1  # skip unmatched, move to next slot
 
         conn.commit()
         cursor.close()
