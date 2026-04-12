@@ -1,12 +1,9 @@
 import os
+import re
 from dotenv import load_dotenv
-from flask import request, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from timetable_ai import extract_subjects_from_image
-from flask import Flask
-import io
-import re
-from werkzeug.utils import secure_filename
 from db import get_connection
 from attendance import (
     get_timetable_week,
@@ -21,38 +18,39 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# In-memory user storage (no database)
+# In-memory user storage (no database yet)
 users = {}
 
 
+# ── Home ──────────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
     return "Attendance Backend Running"
 
 
-# SIGNUP API
+# ── Signup ────────────────────────────────────────────────────────────────────
 @app.route("/signup", methods=["POST"])
 def signup():
     try:
         data = request.json
-        # Just accept the data and return success - no validation, no storage
         return jsonify({"message": "Account created successfully!"}), 201
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
 
-# LOGIN API
+# ── Login ─────────────────────────────────────────────────────────────────────
 @app.route("/login", methods=["POST"])
 def login():
     try:
         data = request.json
-        email = data.get("email", "").strip()
-        password = data.get("password", "").strip()
+        email    = data.get("email") or ""
+        password = data.get("password") or ""
+        email = email.strip()
+        password = password.strip()
 
         if not email or not password:
             return jsonify({"message": "Email and password required"}), 400
 
-        # Check user in memory
         if email in users and users[email]["password"] == password:
             return jsonify({"message": "Login successful", "user": users[email]}), 200
         else:
@@ -61,6 +59,7 @@ def login():
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
 
+# ── Extract timetable from image ──────────────────────────────────────────────
 @app.route("/api/timetable/extract", methods=["POST"])
 def extract_timetable():
     if "image" not in request.files:
@@ -75,8 +74,11 @@ def extract_timetable():
     if ext not in allowed:
         return jsonify({"error": f"File type '{ext}' not supported."}), 400
 
-    # NEW: Get batch from form data
-    batch = request.form.get("batch", "").strip()
+    # Only S1, S2, S3 are valid batches
+    batch = request.form.get("batch") or ""
+    batch = batch.strip()
+    if batch and batch not in ["S1", "S2", "S3"]:
+        return jsonify({"error": f"Invalid batch '{batch}'. Must be S1, S2, or S3."}), 400
 
     try:
         image_bytes = file.read()
@@ -86,25 +88,26 @@ def extract_timetable():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-import re
-
-# Entries to skip — not real subjects
+# ── Helper: entries to skip (not real subjects) ───────────────────────────────
 SKIP_ENTRIES = {
     'LIBRARY', 'COUNSELLING', 'BATCH', 'MINOR', 'CCRP',
     'VSB', 'BREAK', 'LUNCH', 'DT', 'SNZ', 'BSZ', 'SND',
-    'GFM', 'FKS', 'NKS', 'MPN', 'AGS', 'TGM', 'SBT'
+    'GFM', 'FKS', 'NKS', 'MPN', 'AGS', 'TGM', 'SBT', 'PS',
 }
+
 
 def should_skip(entry: str) -> bool:
     """Return True if this entry is not a real subject."""
+    if entry is None or not isinstance(entry, str):
+        return True
     entry = entry.strip()
-    # Remove batch prefix if present
-    batch_match = re.match(r'^[A-Z]\d+[-\s](.+)', entry)
+    batch_match = re.match(r'^[S][123][-\s](.+)', entry)
     if batch_match:
         first_word = batch_match.group(1).split('-')[0].split()[0].upper()
     else:
         first_word = entry.split()[0].upper()
     return first_word in SKIP_ENTRIES
+
 
 def parse_abbreviation(entry: str) -> str:
     """
@@ -116,27 +119,25 @@ def parse_abbreviation(entry: str) -> str:
       "S1-CNL-SBT-507"           → "CNL"
       "S1-PDL-I-TGM-502"         → "PDL"
 
-    Shared theory entries (s2,s3,a1,a2 slots):
+    Shared theory entries (s2, s3, a1, a2 slots):
       "PROGG IN JAVA AGS 505"    → "PROGG"
       "ADS MPN 505"              → "ADS"
       "DCCN SBT 505"             → "DCCN"
       "SEM SNZ 505"              → "SEM"
       "AMCS NKS 505"             → "AMCS"
     """
+    if entry is None or not isinstance(entry, str):
+        return ""
     entry = entry.strip()
 
     # Remove batch prefix: "S1-", "S2-", "S3-"
     batch_match = re.match(r'^[S][123][-\s](.+)', entry)
     if batch_match:
         rest = batch_match.group(1)
-        # "PROGG IN JAVA-AGS-508" → split by dash → "PROGG IN JAVA"
-        # "ADASL-MPN-503"         → split by dash → "ADASL"
         parts = rest.split('-')
         subject_part = parts[0].strip()
-        # First word is the abbreviation
         abbreviation = subject_part.split()[0].upper()
     else:
-        # Shared theory entry: "PROGG IN JAVA AGS 505" → first word
         abbreviation = entry.split()[0].upper()
 
     # Clean: PDL-I → PDL
@@ -145,6 +146,7 @@ def parse_abbreviation(entry: str) -> str:
     return abbreviation
 
 
+# ── Save subjects + schedule to database ─────────────────────────────────────
 @app.route('/api/timetable/save-subjects', methods=['POST'])
 def save_subjects():
     data     = request.get_json()
@@ -156,18 +158,19 @@ def save_subjects():
         return jsonify({"success": False, "error": "user_id is required"}), 400
 
     try:
-        conn = get_connection()
+        conn   = get_connection()
         cursor = conn.cursor()
 
+        # Clear old data for this user
         cursor.execute("DELETE FROM timetable_schedule WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM subjects WHERE user_id = %s", (user_id,))
 
-        # Insert subjects — map short code AND full name → subject_id
+        # Insert subjects and build lookup map: abbreviation/fullname → subject_id
         subject_id_map = {}
 
         for subject in subjects:
-            name  = subject.get('full', '').strip()
-            short = subject.get('short', '').strip()
+            name  = (subject.get('full') or "").strip()
+            short = (subject.get('short') or "").strip()
             types = subject.get('type', ['Theory'])
 
             if not name:
@@ -181,18 +184,17 @@ def save_subjects():
                 type_str = 'Theory'
 
             cursor.execute("""
-                INSERT INTO subjects 
+                INSERT INTO subjects
                     (user_id, subject_name, type, total_classes, attended_classes)
                 VALUES (%s, %s, %s, 0, 0)
             """, (user_id, name, type_str))
 
             new_id = cursor.lastrowid
+            # Map both short code and full name so either can match
             subject_id_map[short.upper()] = new_id
             subject_id_map[name.upper()]  = new_id
 
-        # Slot definitions
-        # s1 = practical slot (8:15-10:15)
-        # s2, s3, a1, a2 = theory slots
+        # Slot keys in order — s1 is always the practical slot (8:15-10:15)
         slot_keys  = ['s1', 's2', 's3', 'a1', 'a2']
         slot_times = {
             's1': '8:15-10:15',
@@ -204,13 +206,14 @@ def save_subjects():
 
         # Save schedule day by day
         for day, subject_list in schedule.items():
-            slot_index = 0  # which slot we are filling
+            slot_index = 0
 
             for raw_entry in subject_list:
                 if slot_index >= len(slot_keys):
                     break
 
-                # Skip junk entries but still advance slot
+                # Skip junk entries (LIBRARY, COUNSELLING, MINOR etc.)
+                # but still advance the slot counter
                 if should_skip(raw_entry):
                     slot_index += 1
                     continue
@@ -218,23 +221,20 @@ def save_subjects():
                 slot_key  = slot_keys[slot_index]
                 time_slot = slot_times[slot_key]
 
-                # Parse abbreviation
                 abbreviation = parse_abbreviation(raw_entry)
-
-                # Look up subject_id
-                subject_id = subject_id_map.get(abbreviation)
+                subject_id   = subject_id_map.get(abbreviation)
 
                 if subject_id:
                     cursor.execute("""
-                        INSERT INTO timetable_schedule 
+                        INSERT INTO timetable_schedule
                             (user_id, subject_id, day_of_week, slot_key, time_slot)
                         VALUES (%s, %s, %s, %s, %s)
                     """, (user_id, subject_id, day, slot_key, time_slot))
-                    slot_index += 1
                 else:
-                    print(f"⚠️ No match for: '{raw_entry}' → '{abbreviation}'")
-                    print(f"   Available: {list(subject_id_map.keys())}")
-                    slot_index += 1  # skip unmatched, move to next slot
+                    print(f"⚠️  No match: '{raw_entry}' → '{abbreviation}'")
+                    print(f"    Available keys: {list(subject_id_map.keys())}")
+
+                slot_index += 1
 
         conn.commit()
         cursor.close()
@@ -250,24 +250,18 @@ def save_subjects():
 
 
 # ── Get subjects for a user ───────────────────────────────────────────────────
-
-
 @app.route("/api/subjects/<int:user_id>", methods=["GET"])
 def get_subjects(user_id):
-    """Returns all subjects for a given user."""
     try:
-        conn = get_connection()
+        conn   = get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT id, subject_name, type, total_classes, attended_classes
             FROM subjects
             WHERE user_id = %s
             ORDER BY subject_name
-        """,
-            (user_id,),
-        )
+        """, (user_id,))
 
         subjects = cursor.fetchall()
         cursor.close()
@@ -279,15 +273,9 @@ def get_subjects(user_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# ── Get full week timetable (simple) ─────────────────────────────────────────
 @app.route("/api/timetable/week/<int:user_id>", methods=["GET"])
 def timetable_week(user_id):
-    """
-    Returns full week in format frontend expects:
-    [
-      { "day": "Monday", "s1": "Java", "s2": "Math", "s3": "DBMS", "a1": "Physics", "a2": "Seminar" },
-      ...
-    ]
-    """
     try:
         week = get_timetable_week(user_id)
         return jsonify({"success": True, "week": week}), 200
@@ -295,21 +283,9 @@ def timetable_week(user_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ── Get timetable with subject details ─────────────────────────────────────
+# ── Get full week timetable (with subject details) ────────────────────────────
 @app.route("/api/timetable/week-details/<int:user_id>", methods=["GET"])
 def timetable_week_details(user_id):
-    """
-    Returns full week with subject details (type, id, time_slot):
-    [
-      {
-        "day": "Monday",
-        "s1": { "subject_name": "Java", "type": "Theory", "subject_id": 1, "time_slot": "8:15-10:15" },
-        "s2": { ... },
-        ...
-      },
-      ...
-    ]
-    """
     try:
         week = get_timetable_week_with_details(user_id)
         return jsonify({"success": True, "week": week}), 200
@@ -330,17 +306,7 @@ def todays_schedule(user_id):
 # ── Mark attendance ───────────────────────────────────────────────────────────
 @app.route("/api/attendance/mark", methods=["POST"])
 def mark_student_attendance():
-    """
-    Expected JSON:
-    {
-      "user_id": 1,
-      "records": [
-        { "subject_id": 1, "slot_key": "s1", "time_slot": "8:15-10:15", "status": "Present" },
-        { "subject_id": 2, "slot_key": "s2", "time_slot": "10:30-11:30", "status": "Absent" }
-      ]
-    }
-    """
-    data = request.get_json()
+    data    = request.get_json()
     user_id = data.get("user_id")
     records = data.get("records", [])
 
@@ -351,12 +317,10 @@ def mark_student_attendance():
 
     try:
         saved = mark_attendance(user_id, records)
-        return (
-            jsonify(
-                {"success": True, "message": f"Attendance marked for {saved} classes"}
-            ),
-            200,
-        )
+        return jsonify({
+            "success": True,
+            "message": f"Attendance marked for {saved} classes"
+        }), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
