@@ -18,18 +18,7 @@ function Timetable({ onSaved }) {
   // NEW: Batch input state
   const [showBatchInput, setShowBatchInput] = useState(false);
   const [batch, setBatch] = useState("");
-  const [allBatches] = useState([
-    "S1",
-    "S2",
-    "S3",
-    "S4",
-    "S5",
-    "S6",
-    "A1",
-    "A2",
-    "B1",
-    "B2",
-  ]);
+  const [allBatches] = useState(["S1", "S2", "S3"]);
 
   function onFileChange(e) {
     const selected = e.target.files?.[0];

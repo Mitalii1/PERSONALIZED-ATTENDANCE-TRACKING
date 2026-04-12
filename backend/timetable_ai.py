@@ -104,34 +104,49 @@ IMPORTANT: Extract ONLY the subjects for Batch {batch}.
 
     prompt = f"""EXTRACT TIMETABLE DATA - OUTPUT MUST BE VALID JSON ONLY
 
-{batch_instruction}
+This is a college timetable with 3 batches: S1, S2, S3.
 
-Extract these exact items from the college timetable image:
+STRUCTURE OF THIS TIMETABLE:
+- 8:15-10:15 slot: Each batch (S1, S2, S3) does a DIFFERENT practical simultaneously
+  Entries look like: "S1-ADASL-MPN-503", "S2-PROGG IN JAVA-AGS-508", "S3-PDL-I-TGM-502"
+  Extract ONLY the entry for batch {batch if batch else 'S1'}
+  
+- 10:30 onwards (theory slots): ALL 3 batches sit TOGETHER in one class
+  Entries look like: "PROGG IN JAVA AGS 505", "SEM SNZ 505", "DCCN SBT 505"
+  These have NO batch prefix — extract them as-is for all batches
 
-1. SUBJECT LEGEND: Find "SUBJECT - STAFF" section
-   - Extract abbreviations (ADASL, PROGG, DCCN, etc.)
-   - Get full subject names
-   - Determine type: "Theory" or "Practical"
+SLOTS:
+s1 = 8:15-10:15   → batch-specific PRACTICAL
+s2 = 10:30-11:30  → shared THEORY
+s3 = 11:30-12:30  → shared THEORY
+a1 = 1:15-2:15    → shared THEORY (after lunch)
+a2 = 2:15-3:15    → shared THEORY (after lunch)
 
-2. WEEKLY SCHEDULE: Parse Monday-Friday grid
-   - Extract subjects for each day
-   - Use abbreviations from legend
+FRIDAY SPECIAL RULE:
+- s1 = 8:15-10:15  → first practical for selected batch
+- s2 = 10:30-12:30 → second practical (spans 2 slots, treat as s2)
+- a1, a2 = theory after lunch
 
-3. TYPE CLASSIFICATION:
-   - Theory: Regular classroom subjects
-   - Practical: Lab subjects (CNL, PDL, etc.) or marked with "LAB"
+SKIP these non-subject entries completely:
+LIBRARY, COUNSELLING, BATCH COUNSELLING, MINOR, CCRP, VSB, BREAK
 
-RESPONSE FORMAT - OUTPUT THIS EXACT JSON STRUCTURE ONLY. DO NOT ADD COMMENTARY, STEPS, OR MARKDOWN:
+SUBJECT LEGEND: Find "SUBJECT - STAFF" section at bottom of image.
+Use it to get full subject names.
 
-{{"abbreviations": [{{"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"}}, {{"short": "PROGG", "full": "Programming in Java", "type": "Theory"}}, {{"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}}], "schedule": {{"Monday": ["ADASL", "PROGG", "CNL", "DCCN"], "Tuesday": ["ADASL", "PROGG", "CNL"], "Wednesday": ["DCCN", "AMCS", "CNL"], "Thursday": ["ADASL", "DCCN", "PROGG"], "Friday": ["PROGG", "CNL", "AMCS"]}}, "raw_text": "Extracted timetable data"}}
+TYPE RULES:
+- s1 slot (8:15-10:15) = ALWAYS Practical
+- CNL, PDL = ALWAYS Practical regardless of slot
+- Everything else = Theory
 
-Instructions: 
-- Output ONLY the JSON object above, no explanations
-- No markdown formatting
-- No code blocks
-- No numbered steps
-- Replace the example subjects with actual extracted subjects
-- Ensure all days Monday-Friday are included"""
+BATCHES ARE ONLY: S1, S2, S3 (no A1, A2, B1, B2)
+
+OUTPUT THIS EXACT JSON ONLY. NO COMMENTARY. NO MARKDOWN. NO STEPS.
+START WITH {{ END WITH }}
+
+{{"abbreviations": [{{"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"}}, {{"short": "PROGG", "full": "Programming in Java", "type": "Theory"}}, {{"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}}, {{"short": "PDL", "full": "PDL Practical", "type": "Practical"}}, {{"short": "DCCN", "full": "Data Communication and Computer Networks", "type": "Theory"}}, {{"short": "AMCS", "full": "Applied Mathematics and Computational Statistics", "type": "Theory"}}, {{"short": "SEM", "full": "Seminar", "type": "Theory"}}], "schedule": {{"Monday": ["S1-ADASL-MPN-503", "PROGG IN JAVA AGS 505", "SEM SNZ 505", "CCRP 505", "MINOR"], "Tuesday": ["S1-ADASL-MPN-503", "SEM SNZ 505", "ADS MPN 505", "LIBRARY", "MINOR"], "Wednesday": ["S1-PROGG IN JAVA-AGS-508", "ADS MPN 505", "DCCN SBT 505", "SEM SNZ 505", "AMCS NKS 505"], "Thursday": ["S1-PROGG IN JAVA-AGS-508", "DCCN SBT 505", "AMCS NKS 505", "BATCH COUNSELLING", "MINOR"], "Friday": ["S1-CNL-SBT-507", "S1-PDL-I-TGM-502", "AMCS NKS 505", "DT FKS 505", "DT FKS 505"]}}, "raw_text": "full raw text from image"}}
+
+Replace ALL example values with actual data extracted from the image.
+For schedule, use the entries exactly as they appear in the image."""
 
     # Use mock mode if enabled or API client not available
     if MOCK_MODE or not client:
