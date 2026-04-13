@@ -1,44 +1,99 @@
-# PERSONALIZED-ATTENDANCE-TRACKING
+# 🎓 Personalized Attendance Tracking System
 
-AI-Powered Personalized Attendance Tracking and Alert System for Students
+**AI-Powered Personalized Attendance Tracking and Alert System for Students**
 
-## 📋 Overview
+[![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
+[![Flask](https://img.shields.io/badge/Flask-Web-black?logo=flask)](https://flask.palletsprojects.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-Database-blue?logo=mysql)](https://www.mysql.com/)
+[![License](https://img.shields.io/badge/License-ISC-green)](LICENSE)
 
-A comprehensive web-based attendance tracking system that uses artificial intelligence to extract timetables from images and monitor student attendance with real-time alerts and statistical analysis.
+---
 
-**Key Features:**
+## 📋 Table of Contents
 
-- 🎓 AI-powered timetable extraction from college timetable images
-- 📱 Batch-aware subject detection (S1-S6, A1-A2, B1-B2)
-- 📅 Weekly timetable display with subject types (Theory/Practical)
-- ✅ Easy attendance marking with daily updates
-- 📊 Real-time attendance statistics per subject
-- 💾 Database-backed persistent storage
-- 🔧 RESTful API architecture
-- 🚀 Responsive React frontend
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation & Setup](#installation--setup)
+- [Configuration](#configuration)
+- [Database Setup](#database-setup)
+- [API Documentation](#api-documentation)
+- [Usage Guide](#usage-guide)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## 📖 Overview
+
+A comprehensive, AI-powered web application designed to help students and educators efficiently track attendance. The system combines OCR technology with machine learning to automatically extract timetables from college schedule images and provides real-time attendance monitoring with statistical insights.
+
+Perfect for educational institutions looking to automate attendance tracking and improve student accountability.
+
+---
+
+## ✨ Features
+
+- ✅ **AI-Powered Timetable Extraction**
+  - Upload college timetable images
+  - Automatic subject and schedule extraction using Groq Vision API
+  - Support for multiple batches (S1-S6, A1-A2, B1-B2)
+
+- 📅 **Intelligent Timetable Management**
+  - Weekly schedule display
+  - Subject type classification (Theory/Practical)
+  - Real-time timetable synchronization
+
+- ✔️ **Easy Attendance Marking**
+  - One-click attendance marking per class
+  - Daily attendance tracking
+  - Persistent storage with database backup
+
+- 📊 **Real-Time Analytics**
+  - Per-subject attendance statistics
+  - Attendance percentage calculations
+  - Visual dashboard with attendance insights
+
+- 🔐 **Secure Data Management**
+  - User authentication (signup/login)
+  - MySQL database for persistent storage
+  - CORS-protected API endpoints
+
+- 🎨 **Responsive Design**
+  - Modern, user-friendly interface
+  - Mobile-optimized dashboard
+  - Intuitive navigation
 
 ---
 
 ## 🏗️ Tech Stack
 
-### Frontend
+### **Frontend**
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| React | 19.x | UI framework with Hooks |
+| CSS3 | Modern | Responsive styling |
+| JavaScript (ES6+) | - | Client-side logic |
+| Bootstrap | 5.3.x | UI components |
 
-- **React 18** with Hooks (useState, useEffect, useMemo)
-- **CSS3** with responsive design
-- **localStorage** for user preferences (optional)
+### **Backend**
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| Python | 3.x | Server-side language |
+| Flask | Latest | Web framework & REST API |
+| MySQL | 8.x+ | Data persistence |
+| CORS | - | Cross-origin requests |
 
-### Backend
-
-- **Python 3.x** with Flask framework
-- **Groq API** with Llama 4-Scout model for AI vision
-- **MySQL** database for persistent storage
-- **CORS** enabled for frontend integration
-
-### AI & Vision
-
-- **Groq Vision API** (meta-llama/llama-4-scout-17b-16e-instruct)
-- Markdown + JSON response parsing
-- Batch-specific subject extraction
+### **AI & Vision**
+| Service | Model | Purpose |
+|---------|-------|---------|
+| Groq API | Llama 4-Scout (17b) | Image-to-text OCR |
+| - | - | Timetable extraction |
 
 ---
 
@@ -46,8 +101,44 @@ A comprehensive web-based attendance tracking system that uses artificial intell
 
 ```
 PERSONALIZED-ATTENDANCE-TRACKING/
-├── backend/
-│   ├── app.py                 # Flask API server
+├── 📄 README.md                    # Project documentation (this file)
+├── 📄 Frontend.md                  # Frontend integration guide
+├── 📄 LICENSE                      # ISC License
+├── 📄 package.json                 # Root package metadata
+│
+├── 📁 backend/
+│   ├── 📄 app.py                   # Flask API server & routes
+│   ├── 📄 timetable_ai.py          # AI image processing (Groq API)
+│   ├── 📄 attendance.py            # Attendance logic & calculations
+│   ├── 📄 db.py                    # Database connection handler
+│   └── 📄 attendance_db.sql        # Database schema & initialization
+│
+└── 📁 forntend/
+    ├── 📄 package.json             # React dependencies
+    ├── 📄 README.md                # Frontend setup guide
+    ├── 📁 public/
+    │   ├── 📄 index.html           # Main HTML file
+    │   ├── 📄 manifest.json        # PWA manifest
+    │   └── 📄 robots.txt           # SEO metadata
+    │
+    └── 📁 src/
+        ├── 📄 index.js             # React entry point
+        ├── 📄 App.js               # Main App component
+        ├── 📄 App.css              # Global styling
+        ├── 📄 index.css            # Base styles
+        │
+        ├── 📁 Components/
+        │   ├── 📄 Getstarted.js    # Onboarding/setup page
+        │   ├── 📄 SubjectMapper.js # Timetable upload & mapping
+        │   ├── 📄 Dashboard.js     # Main dashboard & attendance
+        │   ├── 📄 Timetable.js     # Timetable display component
+        │   └── 📄 *.css            # Component-specific styles
+        │
+        └── 📁 Pages/
+            ├── 📄 First.js         # Onboarding page 1
+            ├── 📄 Second.js        # Onboarding page 2
+            └── 📄 Third.js         # Onboarding page 3
+```
 │   ├── timetable_ai.py        # Groq AI integration for OCR
 │   ├── db.py                  # Database connection utilities
 │   ├── attendance.py          # Attendance logic
