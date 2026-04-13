@@ -43,10 +43,8 @@ def signup():
 def login():
     try:
         data = request.json
-        email    = data.get("email") or ""
-        password = data.get("password") or ""
-        email = email.strip()
-        password = password.strip()
+        email    = data.get("email", "").strip()
+        password = data.get("password", "").strip()
 
         if not email or not password:
             return jsonify({"message": "Email and password required"}), 400
@@ -75,8 +73,7 @@ def extract_timetable():
         return jsonify({"error": f"File type '{ext}' not supported."}), 400
 
     # Only S1, S2, S3 are valid batches
-    batch = request.form.get("batch") or ""
-    batch = batch.strip()
+    batch = request.form.get("batch", "").strip()
     if batch and batch not in ["S1", "S2", "S3"]:
         return jsonify({"error": f"Invalid batch '{batch}'. Must be S1, S2, or S3."}), 400
 
@@ -98,8 +95,6 @@ SKIP_ENTRIES = {
 
 def should_skip(entry: str) -> bool:
     """Return True if this entry is not a real subject."""
-    if entry is None or not isinstance(entry, str):
-        return True
     entry = entry.strip()
     batch_match = re.match(r'^[S][123][-\s](.+)', entry)
     if batch_match:
@@ -126,8 +121,6 @@ def parse_abbreviation(entry: str) -> str:
       "SEM SNZ 505"              → "SEM"
       "AMCS NKS 505"             → "AMCS"
     """
-    if entry is None or not isinstance(entry, str):
-        return ""
     entry = entry.strip()
 
     # Remove batch prefix: "S1-", "S2-", "S3-"
@@ -169,8 +162,8 @@ def save_subjects():
         subject_id_map = {}
 
         for subject in subjects:
-            name  = (subject.get('full') or "").strip()
-            short = (subject.get('short') or "").strip()
+            name  = subject.get('full', '').strip()
+            short = subject.get('short', '').strip()
             types = subject.get('type', ['Theory'])
 
             if not name:
@@ -321,6 +314,81 @@ def mark_student_attendance():
             "success": True,
             "message": f"Attendance marked for {saved} classes"
         }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+# ── Update a single timetable slot ───────────────────────────────────────────
+@app.route("/api/timetable/update-slot", methods=["PUT"])
+def update_timetable_slot():
+    """
+    Auto-saves a single cell change in the timetable.
+    {
+      "user_id": 1,
+      "day": "Monday",
+      "slot_key": "s1",
+      "subject_id": 3   ← null means empty/no class
+    }
+    """
+    data       = request.get_json()
+    user_id    = data.get("user_id")
+    day        = data.get("day")
+    slot_key   = data.get("slot_key")
+    subject_id = data.get("subject_id")  # null = no class
+
+    if not all([user_id, day, slot_key]):
+        return jsonify({"success": False, "error": "user_id, day, slot_key required"}), 400
+
+    slot_times = {
+        's1': '8:15-10:15',
+        's2': '10:30-11:30',
+        's3': '11:30-12:30',
+        'a1': '1:15-2:15',
+        'a2': '2:15-3:15',
+    }
+
+    if slot_key not in slot_times:
+        return jsonify({"success": False, "error": f"Invalid slot_key: {slot_key}"}), 400
+
+    try:
+        conn   = get_connection()
+        cursor = conn.cursor()
+
+        if subject_id is None:
+            # User selected "No class" — delete this slot
+            cursor.execute("""
+                DELETE FROM timetable_schedule
+                WHERE user_id = %s AND day_of_week = %s AND slot_key = %s
+            """, (user_id, day, slot_key))
+        else:
+            # Check if slot already exists
+            cursor.execute("""
+                SELECT id FROM timetable_schedule
+                WHERE user_id = %s AND day_of_week = %s AND slot_key = %s
+            """, (user_id, day, slot_key))
+
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update existing slot
+                cursor.execute("""
+                    UPDATE timetable_schedule
+                    SET subject_id = %s
+                    WHERE user_id = %s AND day_of_week = %s AND slot_key = %s
+                """, (subject_id, user_id, day, slot_key))
+            else:
+                # Insert new slot
+                cursor.execute("""
+                    INSERT INTO timetable_schedule
+                        (user_id, subject_id, day_of_week, slot_key, time_slot)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (user_id, subject_id, day, slot_key, slot_times[slot_key]))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Slot updated"}), 200
+
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

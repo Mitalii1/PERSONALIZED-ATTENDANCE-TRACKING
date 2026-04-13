@@ -632,3 +632,57 @@
   .dash-box-grid { grid-template-columns: 1fr; }
   .attendance-section-header { flex-direction: column; }
 }
+
+/* ── Add these to the bottom of Dashboard.css ── */
+
+/* Slot dropdown wrapper */
+.tt-slot-dropdown-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 2px;
+}
+
+/* Dropdown select */
+.tt-slot-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.8);
+  color: #e5e7eb;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 140ms ease;
+  appearance: auto;
+}
+
+.tt-slot-select:focus {
+  border-color: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3);
+}
+
+.tt-slot-select option {
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+/* Save indicators */
+.tt-slot-indicator {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tt-slot-saving {
+  color: #9ca3af;
+}
+
+.tt-slot-saved {
+  color: #22c55e;
+}
+
+.tt-slot-error {
+  color: #ef4444;
+}
