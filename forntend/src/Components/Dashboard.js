@@ -20,7 +20,7 @@ const ATTENDANCE_SLOT_TIMES_DB = {
   a2: "2:15-3:15",
 };
 
-function Dashboard() {
+function Dashboard({ onGoToTimetable, onLogout }) {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
@@ -28,6 +28,10 @@ function Dashboard() {
   const [subjectSearch, setSubjectSearch] = useState("");
   const [compactTables, setCompactTables] = useState(false);
   const [liveClock, setLiveClock] = useState(new Date());
+  const [notificationCount] = useState(3);
+  const [isUploadLoading, setIsUploadLoading] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [detectedSubjects, setDetectedSubjects] = useState([]);
 
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(true);
   const [attendanceSummary, setAttendanceSummary] = useState([]);
@@ -449,6 +453,24 @@ function Dashboard() {
 
   const handleSubjectSelect = (subject) => setSelectedSubject(subject);
 
+  const simulatedDetectedSubjects = [
+    "Advanced Data Structures and Algorithms",
+    "Programming in Java",
+    "Data Communication and Computer Network",
+    "Applied Mathematics and Computational Statistics",
+    "Computer Networks Lab",
+    "PDL Practical",
+  ];
+
+  const runSimulatedUpload = useCallback(() => {
+    setIsUploadLoading(true);
+    setDetectedSubjects([]);
+    setTimeout(() => {
+      setDetectedSubjects(simulatedDetectedSubjects);
+      setIsUploadLoading(false);
+    }, 1700);
+  }, []);
+
   async function saveAttendanceToDatabase() {
     setSaveStatus("");
     setIsSaving(true);
@@ -755,10 +777,99 @@ function Dashboard() {
               </span>
               <span className="menu-item-label">Timetable</span>
             </button>
+            <button
+              type="button"
+              className={`menu-item ${activeSection === "ai-upload" ? "active" : ""}`}
+              onClick={() => {
+                if (onGoToTimetable) {
+                  onGoToTimetable();
+                } else {
+                  setActiveSection("ai-upload");
+                }
+              }}
+            >
+              <span className="menu-item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 3l2 3 3 .5-2 2.4.5 3.1-3-1.4-3 1.4.5-3.1-2-2.4 3-.5z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M5 16.5a2.5 2.5 0 0 1 2.5-2.5H9m10 2.5A2.5 2.5 0 0 0 16.5 14H15"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <span className="menu-item-label">AI Upload</span>
+            </button>
+            <button
+              type="button"
+              className={`menu-item ${activeSection === "settings" ? "active" : ""}`}
+              onClick={() => setActiveSection("settings")}
+            >
+              <span className="menu-item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 1 0 12 8.5z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                  />
+                  <path
+                    d="M19 12a7.1 7.1 0 0 0-.08-1l2.02-1.57-2-3.46-2.46.7a7.4 7.4 0 0 0-1.72-1l-.38-2.52h-4l-.38 2.52a7.4 7.4 0 0 0-1.72 1l-2.46-.7-2 3.46L5.08 11A7.1 7.1 0 0 0 5 12c0 .34.03.67.08 1l-2.02 1.57 2 3.46 2.46-.7c.53.41 1.11.75 1.72 1l.38 2.52h4l.38-2.52c.61-.25 1.19-.59 1.72-1l2.46.7 2-3.46L18.92 13c.05-.33.08-.66.08-1z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span className="menu-item-label">Settings</span>
+            </button>
           </div>
         </aside>
 
         <div className="dash-content">
+          <header className="dash-topbar">
+            <div>
+              <p className="dash-topbar-label">Premium Workspace</p>
+              <h2 className="dash-topbar-title">Personalized Attendance Tracker</h2>
+            </div>
+            <div className="dash-topbar-right">
+              <div className="dash-topbar-date">
+                <span>{dayLabel}</span>
+                <span>{dateLabel}</span>
+              </div>
+              <button type="button" className="dash-notify-btn" aria-label="Notifications">
+                <span>🔔</span>
+                {notificationCount > 0 && (
+                  <span className="dash-notify-badge">{notificationCount}</span>
+                )}
+              </button>
+              <div className="dash-user-pill">
+                <span className="dash-user-avatar">S</span>
+                <span className="dash-user-name">Shant</span>
+              </div>
+              <button
+                type="button"
+                className="dash-logout-btn"
+                onClick={() => {
+                  if (onLogout) onLogout();
+                }}
+              >
+                Logout
+              </button>
+            </div>
+          </header>
+
           {/* ── DASHBOARD SECTION ── */}
           {activeSection === "dashboard" && (
             <section className="dash-main-screen">
@@ -1527,6 +1638,115 @@ function Dashboard() {
                   </table>
                 </div>
               )}
+            </section>
+          )}
+
+          {/* ── AI UPLOAD SECTION ── */}
+          {activeSection === "ai-upload" && (
+            <section className="dash-content-card ai-upload-view">
+              <h2 className="dash-section-title">AI Timetable Upload</h2>
+              <p className="dash-section-subtitle">
+                Drag and drop your timetable image. This section simulates AI
+                extraction in the UI.
+              </p>
+
+              <div
+                className={`ai-upload-dropzone ${isDragActive ? "ai-upload-dropzone--active" : ""}`}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setIsDragActive(true);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragActive(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragActive(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragActive(false);
+                  runSimulatedUpload();
+                }}
+              >
+                <p className="ai-upload-title">Drop timetable image here</p>
+                <p className="ai-upload-sub">PNG, JPG, JPEG supported (UI simulation)</p>
+                <button
+                  type="button"
+                  className="tt-primary ai-upload-button"
+                  onClick={runSimulatedUpload}
+                  disabled={isUploadLoading}
+                >
+                  {isUploadLoading ? "Analyzing..." : "Upload Timetable"}
+                </button>
+              </div>
+
+              {isUploadLoading && (
+                <div className="ai-upload-loading">
+                  <span className="ai-upload-spinner" />
+                  <p>Analyzing timetable with AI...</p>
+                </div>
+              )}
+
+              {!isUploadLoading && detectedSubjects.length > 0 && (
+                <div className="ai-upload-result">
+                  <p className="ai-upload-result-title">Detected Subjects</p>
+                  <ul className="ai-upload-list">
+                    {detectedSubjects.map((subject) => (
+                      <li key={subject}>{subject}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── SETTINGS SECTION ── */}
+          {activeSection === "settings" && (
+            <section className="dash-content-card settings-view">
+              <h2 className="dash-section-title">Settings</h2>
+              <p className="dash-section-subtitle">
+                Visual preferences and dashboard behavior controls.
+              </p>
+
+              <div className="settings-grid">
+                <article className="settings-card">
+                  <h3>Display Mode</h3>
+                  <p>Switch table density for Attendance and Timetable views.</p>
+                  <button
+                    type="button"
+                    className="dash-chip-btn settings-chip"
+                    onClick={() => setCompactTables((prev) => !prev)}
+                  >
+                    {compactTables ? "Switch to Comfort View" : "Switch to Compact View"}
+                  </button>
+                </article>
+
+                <article className="settings-card">
+                  <h3>Attendance Target</h3>
+                  <p>Current smart target is set to 75%.</p>
+                  <span className="settings-badge">Target: 75%</span>
+                </article>
+
+                <article className="settings-card">
+                  <h3>AI Extraction</h3>
+                  <p>Use AI Upload section to simulate timetable extraction flow.</p>
+                  <button
+                    type="button"
+                    className="dash-chip-btn settings-chip"
+                    onClick={() => {
+                      if (onGoToTimetable) {
+                        onGoToTimetable();
+                      } else {
+                        setActiveSection("ai-upload");
+                      }
+                    }}
+                  >
+                    Open Timetable Upload
+                  </button>
+                </article>
+              </div>
             </section>
           )}
         </div>

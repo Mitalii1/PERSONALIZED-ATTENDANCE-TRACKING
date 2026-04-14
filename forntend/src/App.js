@@ -6,24 +6,33 @@ import Dashboard from './Components/Dashboard';
 
 function App() {
   const [page, setPage] = useState('auth'); // 'auth' | 'timetable' | 'dashboard'
+  const [canReturnToDashboardFromTimetable, setCanReturnToDashboardFromTimetable] = useState(false);
 
   return (
     <div className="App">
       {page === 'auth' && (
         <First
           onLogin={() => setPage('dashboard')}
-          onRegistered={() => setPage('timetable')}
+          onRegistered={() => {
+            setCanReturnToDashboardFromTimetable(false);
+            setPage('timetable');
+          }}
         />
       )}
       {page === 'timetable' && (
         <Second
           onBack={() => setPage('auth')}
           onSaved={() => setPage('dashboard')}
+          onGoDashboard={() => setPage('dashboard')}
+          showBackToDashboard={canReturnToDashboardFromTimetable}
         />
       )}
       {page === 'dashboard' && (
         <Dashboard
-          onGoToTimetable={() => setPage('timetable')}
+          onGoToTimetable={() => {
+            setCanReturnToDashboardFromTimetable(true);
+            setPage('timetable');
+          }}
           onLogout={() => setPage('auth')}
         />
       )}
