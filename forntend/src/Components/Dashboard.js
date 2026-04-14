@@ -914,6 +914,14 @@ function Dashboard() {
                     Only today's row is active — use checkboxes to mark lectures
                     attended.
                   </p>
+                  <div className="attendance-header-metrics">
+                    <span className="attendance-header-pill">
+                      Today Slots: {todaySlots.length}
+                    </span>
+                    <span className="attendance-header-pill">
+                      Overall: {attendedPercent}%
+                    </span>
+                  </div>
                 </div>
                 <div className="attendance-date-boxes">
                   <div className="attendance-date-box">
@@ -1200,32 +1208,22 @@ function Dashboard() {
                       </tbody>
                     </table>
                   </div>
-                  <div
-                    style={{
-                      marginTop: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div className="attendance-actions">
                     <button
                       type="button"
-                      className="tt-primary"
+                      className="tt-primary attendance-save-btn"
                       onClick={saveAttendanceToDatabase}
                       disabled={isSaving}
-                      style={{ width: "auto", padding: "10px 28px" }}
                     >
                       {isSaving ? "Saving..." : "Save Today's Attendance"}
                     </button>
                     {saveStatus && (
                       <p
-                        style={{
-                          margin: 0,
-                          fontSize: "13px",
-                          color:
-                            saveStatusType === "error" ? "#ef4444" : "#22c55e",
-                        }}
+                        className={`attendance-save-status ${
+                          saveStatusType === "error"
+                            ? "attendance-save-status--error"
+                            : "attendance-save-status--success"
+                        }`}
                       >
                         {saveStatus}
                       </p>
@@ -1239,11 +1237,21 @@ function Dashboard() {
           {/* ── TIMETABLE SECTION ── */}
           {activeSection === "timetable" && (
             <section className="dash-content-card timetable-view">
-              <h2 className="dash-section-title">Timetable</h2>
-              <p className="dash-section-subtitle">
-                Select subjects from the dropdown for each slot. Changes save
-                automatically.
-              </p>
+              <div className="timetable-header">
+                <div>
+                  <h2 className="dash-section-title">Timetable</h2>
+                  <p className="dash-section-subtitle">
+                    Select subjects from the dropdown for each slot. Changes
+                    save automatically.
+                  </p>
+                </div>
+                <div className="timetable-header-pills">
+                  <span className="timetable-header-pill">
+                    Subjects: {subjectsList.length}
+                  </span>
+                  <span className="timetable-header-pill">Auto-save ON</span>
+                </div>
+              </div>
 
               {isLoadingTimetable ? (
                 <p style={{ color: "#9ca3af", padding: "20px" }}>
@@ -1278,14 +1286,7 @@ function Dashboard() {
                                 currentSubjectId={row["s1"]?.subject_id ?? null}
                               />
                               {isFriday && (
-                                <span
-                                  style={{
-                                    fontSize: "10px",
-                                    color: "var(--text-muted)",
-                                    display: "block",
-                                    marginTop: "4px",
-                                  }}
-                                >
+                                <span className="timetable-special-note">
                                   8:15 - 10:15 (Practical)
                                 </span>
                               )}
@@ -1313,14 +1314,7 @@ function Dashboard() {
                                     row["s2"]?.subject_id ?? null
                                   }
                                 />
-                                <span
-                                  style={{
-                                    fontSize: "10px",
-                                    color: "var(--text-muted)",
-                                    display: "block",
-                                    marginTop: "4px",
-                                  }}
-                                >
+                                <span className="timetable-special-note">
                                   10:30 - 12:30 (Practical)
                                 </span>
                               </td>
