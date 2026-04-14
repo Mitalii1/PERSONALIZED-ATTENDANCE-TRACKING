@@ -1553,7 +1553,9 @@
   padding: 8px 10px;
   font-size: 12px;
   outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .subject-search-input:focus {
@@ -1650,7 +1652,11 @@
   padding: 18px;
   border-radius: var(--radius);
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.55));
+  background: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.78),
+    rgba(15, 23, 42, 0.55)
+  );
   box-shadow:
     0 10px 24px rgba(2, 8, 23, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -1691,7 +1697,10 @@
   justify-content: space-between;
   color: #dbeafe;
   cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .dash-heatmap-cell:hover {
@@ -1751,7 +1760,11 @@
   padding: 12px 14px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 14px;
-  background: linear-gradient(130deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.52));
+  background: linear-gradient(
+    130deg,
+    rgba(15, 23, 42, 0.86),
+    rgba(30, 41, 59, 0.52)
+  );
   backdrop-filter: blur(10px);
   display: flex;
   justify-content: space-between;

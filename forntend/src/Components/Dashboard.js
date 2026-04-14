@@ -197,9 +197,7 @@ function Dashboard({ onGoToTimetable, onLogout }) {
   const filteredSubjects = useMemo(() => {
     const query = subjectSearch.trim().toLowerCase();
     if (!query) return subjects;
-    return subjects.filter((subject) =>
-      subject.toLowerCase().includes(query),
-    );
+    return subjects.filter((subject) => subject.toLowerCase().includes(query));
   }, [subjects, subjectSearch]);
 
   const [slotAttendanceChecked, setSlotAttendanceChecked] = useState({});
@@ -354,7 +352,10 @@ function Dashboard({ onGoToTimetable, onLogout }) {
 
   const targetProgressPercent = useMemo(() => {
     if (totalLectures === 0) return 0;
-    return Math.min(100, Math.round((attendedPercent / ATTENDANCE_TARGET) * 100));
+    return Math.min(
+      100,
+      Math.round((attendedPercent / ATTENDANCE_TARGET) * 100),
+    );
   }, [totalLectures, attendedPercent]);
 
   const greetingText = useMemo(() => {
@@ -841,14 +842,20 @@ function Dashboard({ onGoToTimetable, onLogout }) {
           <header className="dash-topbar">
             <div>
               <p className="dash-topbar-label">Premium Workspace</p>
-              <h2 className="dash-topbar-title">Personalized Attendance Tracker</h2>
+              <h2 className="dash-topbar-title">
+                Personalized Attendance Tracker
+              </h2>
             </div>
             <div className="dash-topbar-right">
               <div className="dash-topbar-date">
                 <span>{dayLabel}</span>
                 <span>{dateLabel}</span>
               </div>
-              <button type="button" className="dash-notify-btn" aria-label="Notifications">
+              <button
+                type="button"
+                className="dash-notify-btn"
+                aria-label="Notifications"
+              >
                 <span>🔔</span>
                 {notificationCount > 0 && (
                   <span className="dash-notify-badge">{notificationCount}</span>
@@ -1129,14 +1136,18 @@ function Dashboard({ onGoToTimetable, onLogout }) {
                       type="button"
                       role="listitem"
                       className={`dash-heatmap-cell ${
-                        selectedHeatmapDay === item.day ? "dash-heatmap-cell--active" : ""
+                        selectedHeatmapDay === item.day
+                          ? "dash-heatmap-cell--active"
+                          : ""
                       }`}
                       style={{
                         background: `linear-gradient(145deg, rgba(30, 41, 59, 0.75), rgba(34, 211, 238, ${0.12 + item.intensity * 0.45}))`,
                       }}
                       onClick={() => setSelectedHeatmapDay(item.day)}
                     >
-                      <span className="dash-heatmap-day">{item.day.slice(0, 3)}</span>
+                      <span className="dash-heatmap-day">
+                        {item.day.slice(0, 3)}
+                      </span>
                       <span className="dash-heatmap-value">{item.total}</span>
                     </button>
                   ))}
@@ -1144,10 +1155,12 @@ function Dashboard({ onGoToTimetable, onLogout }) {
 
                 <div className="dash-heatmap-meta">
                   <p>
-                    Selected: {selectedHeatmapData?.day || "-"} ({selectedHeatmapData?.total || 0} classes)
+                    Selected: {selectedHeatmapData?.day || "-"} (
+                    {selectedHeatmapData?.total || 0} classes)
                   </p>
                   <p>
-                    Peak day: {busiestHeatmapDay?.day || "-"} ({busiestHeatmapDay?.total || 0} classes)
+                    Peak day: {busiestHeatmapDay?.day || "-"} (
+                    {busiestHeatmapDay?.total || 0} classes)
                   </p>
                 </div>
               </section>
@@ -1331,7 +1344,10 @@ function Dashboard({ onGoToTimetable, onLogout }) {
 
                               {/* s2, s3 for non-Friday; s2 for Friday */}
                               {isFriday && (
-                                <td>
+                                <td
+                                  colSpan={2}
+                                  className="friday-practical-cell"
+                                >
                                   {isCurrentDay ? (
                                     <div className="attendance-slot-inner">
                                       <span className="attendance-slot-time-label">
@@ -1671,7 +1687,9 @@ function Dashboard({ onGoToTimetable, onLogout }) {
                 }}
               >
                 <p className="ai-upload-title">Drop timetable image here</p>
-                <p className="ai-upload-sub">PNG, JPG, JPEG supported (UI simulation)</p>
+                <p className="ai-upload-sub">
+                  PNG, JPG, JPEG supported (UI simulation)
+                </p>
                 <button
                   type="button"
                   className="tt-primary ai-upload-button"
@@ -1713,13 +1731,17 @@ function Dashboard({ onGoToTimetable, onLogout }) {
               <div className="settings-grid">
                 <article className="settings-card">
                   <h3>Display Mode</h3>
-                  <p>Switch table density for Attendance and Timetable views.</p>
+                  <p>
+                    Switch table density for Attendance and Timetable views.
+                  </p>
                   <button
                     type="button"
                     className="dash-chip-btn settings-chip"
                     onClick={() => setCompactTables((prev) => !prev)}
                   >
-                    {compactTables ? "Switch to Comfort View" : "Switch to Compact View"}
+                    {compactTables
+                      ? "Switch to Comfort View"
+                      : "Switch to Compact View"}
                   </button>
                 </article>
 
@@ -1731,7 +1753,9 @@ function Dashboard({ onGoToTimetable, onLogout }) {
 
                 <article className="settings-card">
                   <h3>AI Extraction</h3>
-                  <p>Use AI Upload section to simulate timetable extraction flow.</p>
+                  <p>
+                    Use AI Upload section to simulate timetable extraction flow.
+                  </p>
                   <button
                     type="button"
                     className="dash-chip-btn settings-chip"
