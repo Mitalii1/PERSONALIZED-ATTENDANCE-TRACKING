@@ -20,7 +20,10 @@ const ATTENDANCE_SLOT_TIMES_DB = {
   a2: "2:15-3:15",
 };
 
-function Dashboard({ onGoToTimetable, onLogout }) {
+function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
+  const userId = currentUser?.id;
+  const userName = currentUser?.name || "Student";
+  const userInitial = userName.trim().charAt(0).toUpperCase() || "S";
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
@@ -74,8 +77,12 @@ function Dashboard({ onGoToTimetable, onLogout }) {
   const [timetableDetailed, setTimetableDetailed] = useState([]);
 
   useEffect(() => {
+    if (!userId) {
+      setIsLoadingTimetable(false);
+      return;
+    }
     setIsLoadingTimetable(true);
-    fetch(`${BACKEND_URL}/api/timetable/week-details/1`)
+    fetch(`${BACKEND_URL}/api/timetable/week-details/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.week && data.week.length > 0) {
@@ -93,29 +100,35 @@ function Dashboard({ onGoToTimetable, onLogout }) {
       })
       .catch((err) => console.error("Could not load timetable:", err))
       .finally(() => setIsLoadingTimetable(false));
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/api/subjects/1`)
+    if (!userId) return;
+    fetch(`${BACKEND_URL}/api/subjects/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setSubjectsList(data.subjects);
       })
       .catch((err) => console.error("Could not load subjects:", err));
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/api/attendance/summary/1`)
+    if (!userId) return;
+    fetch(`${BACKEND_URL}/api/attendance/summary/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setAttendanceSummary(data.summary);
       })
       .catch((err) => console.error("Could not load summary:", err));
-  }, [attendanceSaved]);
+  }, [attendanceSaved, userId]);
 
   const updateSlot = useCallback(
     async (day, slotKey, subjectId) => {
       const indicatorKey = `${day}_${slotKey}`;
+      if (!userId) {
+        setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
+        return;
+      }
       setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saving" }));
       try {
         const response = await fetch(
@@ -124,7 +137,7 @@ function Dashboard({ onGoToTimetable, onLogout }) {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              user_id: 1,
+              user_id: userId,
               day,
               slot_key: slotKey,
               subject_id: subjectId,
@@ -180,7 +193,7 @@ function Dashboard({ onGoToTimetable, onLogout }) {
         setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
       }
     },
-    [subjectsList],
+    [subjectsList, userId],
   );
 
   const subjects = useMemo(() => {
@@ -474,6 +487,11 @@ function Dashboard({ onGoToTimetable, onLogout }) {
 
   async function saveAttendanceToDatabase() {
     setSaveStatus("");
+    if (!userId) {
+      setSaveStatus("Your session is missing. Please login again.");
+      setSaveStatusType("error");
+      return;
+    }
     setIsSaving(true);
     const todayRow = timetableWeek.find((r) => r.day === dayLabel);
     if (!todayRow) {
@@ -508,7 +526,7 @@ function Dashboard({ onGoToTimetable, onLogout }) {
       const response = await fetch(`${BACKEND_URL}/api/attendance/mark`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: 1, records }),
+        body: JSON.stringify({ user_id: userId, records }),
       });
       const data = await response.json();
       if (data.success) {
@@ -862,8 +880,8 @@ function Dashboard({ onGoToTimetable, onLogout }) {
                 )}
               </button>
               <div className="dash-user-pill">
-                <span className="dash-user-avatar">S</span>
-                <span className="dash-user-name">Shant</span>
+                <span className="dash-user-avatar">{userInitial}</span>
+                <span className="dash-user-name">{userName}</span>
               </div>
               <button
                 type="button"

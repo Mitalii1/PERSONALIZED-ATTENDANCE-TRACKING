@@ -58,13 +58,23 @@ def signup():
 
         if not name or not email or not password:
             return (
-                jsonify({"success": False, "message": "Name, email and password are required"}),
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Name, email and password are required",
+                    }
+                ),
                 400,
             )
 
         if len(password) < 6:
             return (
-                jsonify({"success": False, "message": "Password must be at least 6 characters"}),
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Password must be at least 6 characters",
+                    }
+                ),
                 400,
             )
 
@@ -77,7 +87,10 @@ def signup():
         if existing:
             cursor.close()
             conn.close()
-            return jsonify({"success": False, "message": "Email already registered"}), 409
+            return (
+                jsonify({"success": False, "message": "Email already registered"}),
+                409,
+            )
 
         hashed_password = generate_password_hash(password)
         cursor.execute(
@@ -120,7 +133,10 @@ def login():
         password = data.get("password", "")
 
         if not email or not password:
-            return jsonify({"success": False, "message": "Email and password required"}), 400
+            return (
+                jsonify({"success": False, "message": "Email and password required"}),
+                400,
+            )
 
         ensure_users_table()
         conn = get_connection()
@@ -134,7 +150,10 @@ def login():
         conn.close()
 
         if not user or not check_password_hash(user["password"], password):
-            return jsonify({"success": False, "message": "Invalid email or password"}), 401
+            return (
+                jsonify({"success": False, "message": "Invalid email or password"}),
+                401,
+            )
 
         return (
             jsonify(

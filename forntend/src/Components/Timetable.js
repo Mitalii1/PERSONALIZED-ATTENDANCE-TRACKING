@@ -5,7 +5,7 @@ import "./Timetable.css";
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
-function Timetable({ onSaved }) {
+function Timetable({ onSaved, userId }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
   const [status, setStatus] = useState("");
@@ -95,47 +95,55 @@ function Timetable({ onSaved }) {
   }
 
   async function saveSubjectsToDB(subjects) {
-  setIsLoading(true);
-  setStatus("Saving subjects to database...");
-  setStatusType("success");
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/timetable/save-subjects`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: 1,        // 🔴 replace with real user_id later
-        subjects: subjects,
-        schedule: schedule // ← this is already in state from the AI response
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      setStatus(`Error saving: ${data.error || "Something went wrong."}`);
+    if (!userId) {
+      setStatus("Your session is missing. Please login again.");
       setStatusType("error");
       return;
     }
 
-    setStatus(`✅ ${data.message}`);
+    setIsLoading(true);
+    setStatus("Saving subjects to database...");
     setStatusType("success");
-    setFile(null);
-    setPreview("");
-    setAbbreviations([]);
-    setSchedule({});
 
-    if (typeof onSaved === "function") {
-      onSaved(subjects);
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/timetable/save-subjects`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            subjects: subjects,
+            schedule: schedule, // ← this is already in state from the AI response
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setStatus(`Error saving: ${data.error || "Something went wrong."}`);
+        setStatusType("error");
+        return;
+      }
+
+      setStatus(`✅ ${data.message}`);
+      setStatusType("success");
+      setFile(null);
+      setPreview("");
+      setAbbreviations([]);
+      setSchedule({});
+
+      if (typeof onSaved === "function") {
+        onSaved(subjects);
+      }
+    } catch (error) {
+      setStatus(`Could not reach server: ${error.message}`);
+      setStatusType("error");
+    } finally {
+      setIsLoading(false);
     }
-
-  } catch (error) {
-    setStatus(`Could not reach server: ${error.message}`);
-    setStatusType("error");
-  } finally {
-    setIsLoading(false);
   }
-}
 
   async function handleMapperConfirm(confirmedMapping) {
     setShowMapper(false); // hide the mapper
