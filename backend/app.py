@@ -3,6 +3,7 @@ import re
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 from timetable_ai import extract_subjects_from_image
 from db import get_connection
 from attendance import (
@@ -18,8 +19,25 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# In-memory user storage (no database yet)
-users = {}
+
+def ensure_users_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            year VARCHAR(20) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 # ── Home ──────────────────────────────────────────────────────────────────────
@@ -32,29 +50,109 @@ def home():
 @app.route("/signup", methods=["POST"])
 def signup():
     try:
-        data = request.json
-        return jsonify({"message": "Account created successfully!"}), 201
+        data = request.get_json() or {}
+        name = data.get("name", "").strip()
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
+        year = data.get("year", "").strip() or None
+
+        if not name or not email or not password:
+            return (
+                jsonify({"success": False, "message": "Name, email and password are required"}),
+                400,
+            )
+
+        if len(password) < 6:
+            return (
+                jsonify({"success": False, "message": "Password must be at least 6 characters"}),
+                400,
+            )
+
+        ensure_users_table()
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.close()
+            conn.close()
+            return jsonify({"success": False, "message": "Email already registered"}), 409
+
+        hashed_password = generate_password_hash(password)
+        cursor.execute(
+            """
+            INSERT INTO users (name, email, password, year)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (name, email, hashed_password, year),
+        )
+        user_id = cursor.lastrowid
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Account created successfully!",
+                    "user": {
+                        "id": user_id,
+                        "name": name,
+                        "email": email,
+                        "year": year,
+                    },
+                }
+            ),
+            201,
+        )
     except Exception as e:
-        return jsonify({"message": f"Error: {str(e)}"}), 500
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 @app.route("/login", methods=["POST"])
 def login():
     try:
-        data = request.json
-        email = data.get("email", "").strip()
-        password = data.get("password", "").strip()
+        data = request.get_json() or {}
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
 
         if not email or not password:
-            return jsonify({"message": "Email and password required"}), 400
+            return jsonify({"success": False, "message": "Email and password required"}), 400
 
-        if email in users and users[email]["password"] == password:
-            return jsonify({"message": "Login successful", "user": users[email]}), 200
-        else:
-            return jsonify({"message": "Invalid email or password"}), 401
+        ensure_users_table()
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, name, email, password, year FROM users WHERE email = %s",
+            (email,),
+        )
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not user or not check_password_hash(user["password"], password):
+            return jsonify({"success": False, "message": "Invalid email or password"}), 401
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Login successful",
+                    "user": {
+                        "id": user["id"],
+                        "name": user["name"],
+                        "email": user["email"],
+                        "year": user.get("year"),
+                    },
+                }
+            ),
+            200,
+        )
     except Exception as e:
-        return jsonify({"message": f"Error: {str(e)}"}), 500
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 
 # ── Extract timetable from image ──────────────────────────────────────────────
