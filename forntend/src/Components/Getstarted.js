@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './getstarted.css';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+
 function Getstarted({ onLogin, onRegistered }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [theme, setTheme] = useState(() => localStorage.getItem('pat-theme') || 'light'); // 'light' | 'dark'
@@ -115,30 +117,59 @@ function Getstarted({ onLogin, onRegistered }) {
     setSubmitting(true);
     setStatus({ type: '', message: '' });
 
-    // No backend call - just proceed to next page
-    setSubmitting(false);
-    setStatus({
-      type: 'success',
-      message: isRegister ? 'Account created successfully!' : 'Login successful!',
-    });
+    try {
+      if (isRegister) {
+        const response = await fetch(`${BACKEND_URL}/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: values.name.trim(),
+            email: values.email.trim(),
+            password: values.password,
+            year: values.year,
+          }),
+        });
 
-    // Clear form on success
-    if (isRegister) {
-      setValues({ name: '', email: '', password: '', confirmPassword: '', year: '', remember: false });
-      if (typeof onRegistered === 'function') {
-        onRegistered({
-          name: values.name,
-          email: values.email,
-          year: values.year,
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          setStatus({ type: 'error', message: data.message || 'Signup failed.' });
+          microShake();
+          return;
+        }
+
+        setStatus({ type: 'success', message: data.message || 'Account created successfully!' });
+        setValues({ name: '', email: '', password: '', confirmPassword: '', year: '', remember: false });
+        if (typeof onRegistered === 'function') {
+          onRegistered(data.user || { email: values.email.trim() });
+        }
+      } else {
+        const response = await fetch(`${BACKEND_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: values.email.trim(),
+            password: values.password,
+          }),
         });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          setStatus({ type: 'error', message: data.message || 'Login failed.' });
+          microShake();
+          return;
+        }
+
+        setStatus({ type: 'success', message: data.message || 'Login successful!' });
+        setValues((prev) => ({ ...prev, password: '' }));
+        if (typeof onLogin === 'function') {
+          onLogin(data.user || { email: values.email.trim() });
+        }
       }
-    } else {
-      setValues({ ...values, password: '' });
-      if (typeof onLogin === 'function') {
-        onLogin({
-          email: values.email,
-        });
-      }
+    } catch (err) {
+      setStatus({ type: 'error', message: `Could not reach server: ${err.message}` });
+      microShake();
+    } finally {
+      setSubmitting(false);
     }
   }
 
