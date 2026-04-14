@@ -213,6 +213,10 @@ def save_subjects():
 
                 slot_key  = slot_keys[slot_index]
                 time_slot = slot_times[slot_key]
+                
+                # Special case for Friday practical — s2 spans 10:10-12:30
+                if day == "Friday" and slot_key == "s2":
+                    time_slot = "10:10-12:30"
 
                 abbreviation = parse_abbreviation(raw_entry)
                 subject_id   = subject_id_map.get(abbreviation)

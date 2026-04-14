@@ -89,7 +89,7 @@ def extract_subjects_from_image(image_bytes: bytes, batch: str = None) -> dict:
                 "Tuesday":   ["S1-ADASL-MPN-503",       "SEM SNZ 505",           "ADS MPN 505",   "LIBRARY",            "MINOR"],
                 "Wednesday": ["S1-PROGG IN JAVA-AGS-508","ADS MPN 505",           "DCCN SBT 505",  "SEM SNZ 505",        "AMCS NKS 505"],
                 "Thursday":  ["S1-PROGG IN JAVA-AGS-508","DCCN SBT 505",          "AMCS NKS 505",  "BATCH COUNSELLING",  "MINOR"],
-                "Friday":    ["S1-CNL-SBT-507",          "S1-PDL-I-TGM-502",      "AMCS NKS 505",  "DT FKS 505",         "DT FKS 505"],
+                "Friday":    ["S1-CNL-SBT-507",          "S1-PDL-I-TGM-502"],
             },
             "raw_text": "Mock timetable for S1 batch",
         }
