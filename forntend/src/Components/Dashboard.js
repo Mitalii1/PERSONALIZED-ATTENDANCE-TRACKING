@@ -26,23 +26,31 @@ function Dashboard() {
   const [selectedSubject, setSelectedSubject] = useState(null);
 
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(true);
-  const [attendanceSummary, setAttendanceSummary]   = useState([]);
-  const [attendanceSaved, setAttendanceSaved]        = useState(false);
-  const [saveStatus, setSaveStatus]                  = useState("");
-  const [saveStatusType, setSaveStatusType]          = useState("success");
-  const [isSaving, setIsSaving]                      = useState(false);
+  const [attendanceSummary, setAttendanceSummary] = useState([]);
+  const [attendanceSaved, setAttendanceSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [saveStatusType, setSaveStatusType] = useState("success");
+  const [isSaving, setIsSaving] = useState(false);
 
-  // ── NEW: subjects list for dropdown ──────────────────────────────────────
   const [subjectsList, setSubjectsList] = useState([]);
-  // slot save indicators { "Monday_s1": "saved" | "saving" | "error" }
   const [slotSaveState, setSlotSaveState] = useState({});
 
   const normalizeSubject = (subjectText) => {
     if (!subjectText || !String(subjectText).trim()) return null;
     const cleanup = String(subjectText).trim();
     const removeTokens = [
-      "Practical", "Lab", "Seminar", "Project", "Elective",
-      "Review", "Workshop", "Session", "Tutorial", "Class", "Lecture", "Theory",
+      "Practical",
+      "Lab",
+      "Seminar",
+      "Project",
+      "Elective",
+      "Review",
+      "Workshop",
+      "Session",
+      "Tutorial",
+      "Class",
+      "Lecture",
+      "Theory",
     ];
     let normalized = cleanup;
     removeTokens.forEach((token) => {
@@ -54,13 +62,11 @@ function Dashboard() {
     return normalized;
   };
 
-  const [timetableWeek, setTimetableWeek]         = useState([]);
+  const [timetableWeek, setTimetableWeek] = useState([]);
   const [timetableDetailed, setTimetableDetailed] = useState([]);
 
-  // ── Fetch timetable from DB ───────────────────────────────────────────────
   useEffect(() => {
     setIsLoadingTimetable(true);
-
     fetch(`${BACKEND_URL}/api/timetable/week-details/1`)
       .then((res) => res.json())
       .then((data) => {
@@ -68,11 +74,11 @@ function Dashboard() {
           setTimetableDetailed(data.week);
           const simpleWeek = data.week.map((row) => ({
             day: row.day,
-            s1:  row.s1?.subject_name || "",
-            s2:  row.s2?.subject_name || "",
-            s3:  row.s3?.subject_name || "",
-            a1:  row.a1?.subject_name || "",
-            a2:  row.a2?.subject_name || "",
+            s1: row.s1?.subject_name || "",
+            s2: row.s2?.subject_name || "",
+            s3: row.s3?.subject_name || "",
+            a1: row.a1?.subject_name || "",
+            a2: row.a2?.subject_name || "",
           }));
           setTimetableWeek(simpleWeek);
         }
@@ -81,19 +87,15 @@ function Dashboard() {
       .finally(() => setIsLoadingTimetable(false));
   }, []);
 
-  // ── Fetch subjects list for dropdown ─────────────────────────────────────
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/subjects/1`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) {
-          setSubjectsList(data.subjects);
-        }
+        if (data.success) setSubjectsList(data.subjects);
       })
       .catch((err) => console.error("Could not load subjects:", err));
   }, []);
 
-  // ── Fetch attendance summary ──────────────────────────────────────────────
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/attendance/summary/1`)
       .then((res) => res.json())
@@ -103,72 +105,75 @@ function Dashboard() {
       .catch((err) => console.error("Could not load summary:", err));
   }, [attendanceSaved]);
 
-  // ── Auto-save a single slot change ───────────────────────────────────────
-  const updateSlot = useCallback(async (day, slotKey, subjectId) => {
-    const indicatorKey = `${day}_${slotKey}`;
-    setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saving" }));
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/timetable/update-slot`, {
-        method:  "PUT",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          user_id:    1,  // 🔴 replace with real user_id later
-          day,
-          slot_key:   slotKey,
-          subject_id: subjectId,  // null = no class
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saved" }));
-        // Clear indicator after 2 seconds
-        setTimeout(() => {
-          setSlotSaveState((prev) => {
-            const next = { ...prev };
-            delete next[indicatorKey];
-            return next;
-          });
-        }, 2000);
-
-        // Also update local timetableDetailed state
-        setTimetableDetailed((prev) =>
-          prev.map((row) => {
-            if (row.day !== day) return row;
-            const updatedSlot = subjectId === null
-              ? null
-              : {
-                  subject_id:   subjectId,
-                  subject_name: subjectsList.find((s) => s.id === subjectId)?.subject_name || "",
-                  type:         subjectsList.find((s) => s.id === subjectId)?.type || "Theory",
-                  slot_key:     slotKey,
-                  time_slot:    ATTENDANCE_SLOT_TIMES_DB[slotKey],
-                };
-            return { ...row, [slotKey]: updatedSlot };
-          })
+  const updateSlot = useCallback(
+    async (day, slotKey, subjectId) => {
+      const indicatorKey = `${day}_${slotKey}`;
+      setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saving" }));
+      try {
+        const response = await fetch(
+          `${BACKEND_URL}/api/timetable/update-slot`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: 1,
+              day,
+              slot_key: slotKey,
+              subject_id: subjectId,
+            }),
+          },
         );
-
-        // Update simple timetableWeek too (for attendance section)
-        setTimetableWeek((prev) =>
-          prev.map((row) => {
-            if (row.day !== day) return row;
-            const subjectName = subjectId === null
-              ? ""
-              : subjectsList.find((s) => s.id === subjectId)?.subject_name || "";
-            return { ...row, [slotKey]: subjectName };
-          })
-        );
-
-      } else {
+        const data = await response.json();
+        if (data.success) {
+          setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saved" }));
+          setTimeout(() => {
+            setSlotSaveState((prev) => {
+              const next = { ...prev };
+              delete next[indicatorKey];
+              return next;
+            });
+          }, 2000);
+          setTimetableDetailed((prev) =>
+            prev.map((row) => {
+              if (row.day !== day) return row;
+              const updatedSlot =
+                subjectId === null
+                  ? null
+                  : {
+                      subject_id: subjectId,
+                      subject_name:
+                        subjectsList.find((s) => s.id === subjectId)
+                          ?.subject_name || "",
+                      type:
+                        subjectsList.find((s) => s.id === subjectId)?.type ||
+                        "Theory",
+                      slot_key: slotKey,
+                      time_slot: ATTENDANCE_SLOT_TIMES_DB[slotKey],
+                    };
+              return { ...row, [slotKey]: updatedSlot };
+            }),
+          );
+          setTimetableWeek((prev) =>
+            prev.map((row) => {
+              if (row.day !== day) return row;
+              const subjectName =
+                subjectId === null
+                  ? ""
+                  : subjectsList.find((s) => s.id === subjectId)
+                      ?.subject_name || "";
+              return { ...row, [slotKey]: subjectName };
+            }),
+          );
+        } else {
+          setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
+        }
+      } catch (err) {
+        console.error("Slot update error:", err);
         setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
       }
-    } catch (err) {
-      console.error("Slot update error:", err);
-      setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
-    }
-  }, [subjectsList]);
+    },
+    [subjectsList],
+  );
 
   const subjects = useMemo(() => {
     const set = new Set();
@@ -213,63 +218,97 @@ function Dashboard() {
     const data = {};
     subjects.forEach((sub) => {
       const summaryItem = attendanceSummary.find(
-        (s) => s.subject_name === sub || normalizeSubject(s.subject_name) === sub,
+        (s) =>
+          s.subject_name === sub || normalizeSubject(s.subject_name) === sub,
       );
       if (summaryItem) {
         data[sub] = {
-          totalLectures:    summaryItem.total_classes,
+          totalLectures: summaryItem.total_classes,
           attendedLectures: summaryItem.attended_classes,
-          missedLectures:   Math.max(0, summaryItem.total_classes - summaryItem.attended_classes),
-          attendedPercent:  summaryItem.percentage,
-          subjectId:        summaryItem.id,
+          missedLectures: Math.max(
+            0,
+            summaryItem.total_classes - summaryItem.attended_classes,
+          ),
+          attendedPercent: summaryItem.percentage,
+          subjectId: summaryItem.id,
         };
       } else {
-        const total    = timetableSubjectTotals[sub] || 0;
+        const total = timetableSubjectTotals[sub] || 0;
         const attended = timetableSubjectAttended[sub] || 0;
         data[sub] = {
-          totalLectures:    total,
+          totalLectures: total,
           attendedLectures: attended,
-          missedLectures:   Math.max(0, total - attended),
-          attendedPercent:  total === 0 ? 0 : Math.round((attended / total) * 100),
-          subjectId:        null,
+          missedLectures: Math.max(0, total - attended),
+          attendedPercent:
+            total === 0 ? 0 : Math.round((attended / total) * 100),
+          subjectId: null,
         };
       }
     });
     return data;
-  }, [subjects, timetableSubjectTotals, timetableSubjectAttended, attendanceSummary]);
+  }, [
+    subjects,
+    timetableSubjectTotals,
+    timetableSubjectAttended,
+    attendanceSummary,
+  ]);
 
   const overallTotal = useMemo(() => {
     if (attendanceSummary.length > 0)
-      return attendanceSummary.reduce((sum, s) => sum + (s.total_classes || 0), 0);
-    return subjects.reduce((sum, s) => sum + (weeklySubjectData[s]?.totalLectures || 0), 0);
+      return attendanceSummary.reduce(
+        (sum, s) => sum + (s.total_classes || 0),
+        0,
+      );
+    return subjects.reduce(
+      (sum, s) => sum + (weeklySubjectData[s]?.totalLectures || 0),
+      0,
+    );
   }, [attendanceSummary, subjects, weeklySubjectData]);
 
   const overallAttended = useMemo(() => {
     if (attendanceSummary.length > 0)
-      return attendanceSummary.reduce((sum, s) => sum + (s.attended_classes || 0), 0);
-    return subjects.reduce((sum, s) => sum + (weeklySubjectData[s]?.attendedLectures || 0), 0);
+      return attendanceSummary.reduce(
+        (sum, s) => sum + (s.attended_classes || 0),
+        0,
+      );
+    return subjects.reduce(
+      (sum, s) => sum + (weeklySubjectData[s]?.attendedLectures || 0),
+      0,
+    );
   }, [attendanceSummary, subjects, weeklySubjectData]);
 
   const currentStats = selectedSubject
-    ? weeklySubjectData[selectedSubject] || { totalLectures: 0, attendedLectures: 0 }
+    ? weeklySubjectData[selectedSubject] || {
+        totalLectures: 0,
+        attendedLectures: 0,
+      }
     : { totalLectures: overallTotal, attendedLectures: overallAttended };
 
-  const totalLectures    = currentStats.totalLectures;
+  const totalLectures = currentStats.totalLectures;
   const attendedLectures = currentStats.attendedLectures;
-  const missedLectures   = currentStats.totalLectures - currentStats.attendedLectures;
-  const attendedPercent  = currentStats.totalLectures === 0 ? 0
-    : Math.round((currentStats.attendedLectures / currentStats.totalLectures) * 100);
+  const missedLectures =
+    currentStats.totalLectures - currentStats.attendedLectures;
+  const attendedPercent =
+    currentStats.totalLectures === 0
+      ? 0
+      : Math.round(
+          (currentStats.attendedLectures / currentStats.totalLectures) * 100,
+        );
   const missedPercent = 100 - attendedPercent;
 
-  const now       = new Date();
-  const dayLabel  = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dateLabel = now.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+  const now = new Date();
+  const dayLabel = now.toLocaleDateString("en-US", { weekday: "long" });
+  const dateLabel = now.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const attendanceDateBoxes = useMemo(() => {
     const d = new Date();
     return {
       month: d.toLocaleDateString("en-US", { month: "long" }),
-      day:   d.getDate(),
+      day: d.getDate(),
     };
   }, []);
 
@@ -284,7 +323,6 @@ function Dashboard() {
   async function saveAttendanceToDatabase() {
     setSaveStatus("");
     setIsSaving(true);
-
     const todayRow = timetableWeek.find((r) => r.day === dayLabel);
     if (!todayRow) {
       setSaveStatus("No classes found for today.");
@@ -292,38 +330,33 @@ function Dashboard() {
       setIsSaving(false);
       return;
     }
-
     const records = [];
     ["s1", "s2", "s3", "a1", "a2"].forEach((field) => {
       const subjectName = todayRow[field];
       if (!subjectName) return;
-
-      const slotKey       = `${dayLabel}_${field}`;
-      const isChecked     = !!slotAttendanceChecked[slotKey];
+      const slotKey = `${dayLabel}_${field}`;
+      const isChecked = !!slotAttendanceChecked[slotKey];
       const todayDetailed = timetableDetailed.find((r) => r.day === dayLabel);
-      const subjectId     = todayDetailed?.[field]?.subject_id || null;
-
+      const subjectId = todayDetailed?.[field]?.subject_id || null;
       records.push({
-        subject_id:   subjectId,
+        subject_id: subjectId,
         subject_name: subjectName,
-        slot_key:     field,
-        time_slot:    ATTENDANCE_SLOT_TIMES_DB[field],
-        status:       isChecked ? "Present" : "Absent",
+        slot_key: field,
+        time_slot: ATTENDANCE_SLOT_TIMES_DB[field],
+        status: isChecked ? "Present" : "Absent",
       });
     });
-
     if (records.length === 0) {
       setSaveStatus("No classes scheduled for today.");
       setSaveStatusType("error");
       setIsSaving(false);
       return;
     }
-
     try {
       const response = await fetch(`${BACKEND_URL}/api/attendance/mark`, {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ user_id: 1, records }),
+        body: JSON.stringify({ user_id: 1, records }),
       });
       const data = await response.json();
       if (data.success) {
@@ -342,18 +375,17 @@ function Dashboard() {
     }
   }
 
-  // ── Slot dropdown cell component ──────────────────────────────────────────
   const SlotDropdown = ({ day, slotKey, currentSubjectId }) => {
     const indicatorKey = `${day}_${slotKey}`;
-    const state        = slotSaveState[indicatorKey];
-
+    const state = slotSaveState[indicatorKey];
     return (
       <div className="tt-slot-dropdown-wrap">
         <select
           className="tt-slot-select"
           value={currentSubjectId ?? ""}
           onChange={(e) => {
-            const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+            const val =
+              e.target.value === "" ? null : parseInt(e.target.value, 10);
             updateSlot(day, slotKey, val);
           }}
         >
@@ -364,8 +396,6 @@ function Dashboard() {
             </option>
           ))}
         </select>
-
-        {/* Save indicator */}
         {state === "saving" && (
           <span className="tt-slot-indicator tt-slot-saving">saving…</span>
         )}
@@ -379,54 +409,219 @@ function Dashboard() {
     );
   };
 
+  // Shared thead for both timetable and attendance tables
+  const TableHead = () => (
+    <thead>
+      <tr>
+        <th scope="col" className="timetable-th-day">
+          DAY
+        </th>
+        <th scope="col">
+          <span className="timetable-time">8:15 – 10:15</span>
+        </th>
+        <th scope="col" className="timetable-th-break">
+          10:15 – 10:30<span className="timetable-lunch-sub">Break</span>
+        </th>
+        <th scope="col">
+          <span className="timetable-time">10:30 – 11:30</span>
+        </th>
+        <th scope="col">
+          <span className="timetable-time">11:30 – 12:30</span>
+        </th>
+        <th scope="col" className="timetable-th-lunch">
+          12:30 – 1:15<span className="timetable-lunch-sub">Lunch break</span>
+        </th>
+        <th scope="col">
+          <span className="timetable-time">1:15 – 2:15</span>
+        </th>
+        <th scope="col">
+          <span className="timetable-time">2:15 – 3:15</span>
+        </th>
+      </tr>
+    </thead>
+  );
+
   return (
     <div className="dash">
       <div className={`dash-shell ${sidebarOpen ? "sidebar-open" : ""}`}>
         <aside className="dash-sidebar" aria-label="Dashboard sidebar">
           <div className="sidebar-title" aria-label="Sidebar logo">
             <div className="dash-logo sidebar-logo">
-              <svg className="dash-logo-cat" viewBox="0 0 64 64" role="img" aria-label="Cat face with glasses">
-                <path d="M16 24l4-10 8 7M48 24l-4-10-8 7" fill="none" stroke="#063447" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="dash-logo-cat"
+                viewBox="0 0 64 64"
+                role="img"
+                aria-label="Cat face with glasses"
+              >
+                <path
+                  d="M16 24l4-10 8 7M48 24l-4-10-8 7"
+                  fill="none"
+                  stroke="#063447"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
                 <circle cx="32" cy="34" r="15" fill="#d8f4ff" />
-                <circle cx="25.5" cy="33.5" r="5" fill="none" stroke="#063447" strokeWidth="2.7" />
-                <circle cx="38.5" cy="33.5" r="5" fill="none" stroke="#063447" strokeWidth="2.7" />
-                <line x1="30.5" y1="33.5" x2="33.5" y2="33.5" stroke="#063447" strokeWidth="2.4" strokeLinecap="round" />
+                <circle
+                  cx="25.5"
+                  cy="33.5"
+                  r="5"
+                  fill="none"
+                  stroke="#063447"
+                  strokeWidth="2.7"
+                />
+                <circle
+                  cx="38.5"
+                  cy="33.5"
+                  r="5"
+                  fill="none"
+                  stroke="#063447"
+                  strokeWidth="2.7"
+                />
+                <line
+                  x1="30.5"
+                  y1="33.5"
+                  x2="33.5"
+                  y2="33.5"
+                  stroke="#063447"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                />
                 <circle cx="25.5" cy="33.5" r="1.6" fill="#063447" />
                 <circle cx="38.5" cy="33.5" r="1.6" fill="#063447" />
                 <path d="M32 37.5l-2 2h4z" fill="#063447" />
-                <path d="M28.2 42c1.4 1.5 2.5 2.1 3.8 2.1S34.4 43.5 35.8 42" fill="none" stroke="#063447" strokeWidth="2.2" strokeLinecap="round" />
-                <line x1="22.5" y1="38.5" x2="17.8" y2="37.2" stroke="#063447" strokeWidth="1.6" strokeLinecap="round" />
-                <line x1="22.8" y1="40.8" x2="17.3" y2="41.2" stroke="#063447" strokeWidth="1.6" strokeLinecap="round" />
-                <line x1="41.5" y1="38.5" x2="46.2" y2="37.2" stroke="#063447" strokeWidth="1.6" strokeLinecap="round" />
-                <line x1="41.2" y1="40.8" x2="46.7" y2="41.2" stroke="#063447" strokeWidth="1.6" strokeLinecap="round" />
+                <path
+                  d="M28.2 42c1.4 1.5 2.5 2.1 3.8 2.1S34.4 43.5 35.8 42"
+                  fill="none"
+                  stroke="#063447"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="22.5"
+                  y1="38.5"
+                  x2="17.8"
+                  y2="37.2"
+                  stroke="#063447"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="22.8"
+                  y1="40.8"
+                  x2="17.3"
+                  y2="41.2"
+                  stroke="#063447"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="41.5"
+                  y1="38.5"
+                  x2="46.2"
+                  y2="37.2"
+                  stroke="#063447"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="41.2"
+                  y1="40.8"
+                  x2="46.7"
+                  y2="41.2"
+                  stroke="#063447"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
               </svg>
             </div>
           </div>
           <div className="sidebar-items">
-            <button type="button" className={`menu-item ${activeSection === "dashboard" ? "active" : ""}`} onClick={() => setActiveSection("dashboard")}>
+            <button
+              type="button"
+              className={`menu-item ${activeSection === "dashboard" ? "active" : ""}`}
+              onClick={() => setActiveSection("dashboard")}
+            >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
-                  <path d="M12 3a9 9 0 1 0 9 9h-9z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M12 3v9h9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M12 3a9 9 0 1 0 9 9h-9z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M12 3v9h9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </span>
               <span className="menu-item-label">Dashboard</span>
             </button>
-            <button type="button" className={`menu-item ${activeSection === "attendance" ? "active" : ""}`} onClick={() => setActiveSection("attendance")}>
+            <button
+              type="button"
+              className={`menu-item ${activeSection === "attendance" ? "active" : ""}`}
+              onClick={() => setActiveSection("attendance")}
+            >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
-                  <path d="M8 20v-9.5a1 1 0 0 1 2 0V14m0-5.5a1 1 0 0 1 2 0V14m0-4.5a1 1 0 0 1 2 0V14m0-3a1 1 0 0 1 2 0v6.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M8 14l-1.5-1.2a1 1 0 0 0-1.4.2l-.3.4a1 1 0 0 0 .1 1.3l2.5 2.6A5 5 0 0 0 11 19h3.5a4.5 4.5 0 0 0 4.5-4.5V14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M8 20v-9.5a1 1 0 0 1 2 0V14m0-5.5a1 1 0 0 1 2 0V14m0-4.5a1 1 0 0 1 2 0V14m0-3a1 1 0 0 1 2 0v6.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M8 14l-1.5-1.2a1 1 0 0 0-1.4.2l-.3.4a1 1 0 0 0 .1 1.3l2.5 2.6A5 5 0 0 0 11 19h3.5a4.5 4.5 0 0 0 4.5-4.5V14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </span>
               <span className="menu-item-label">Attendance</span>
             </button>
-            <button type="button" className={`menu-item ${activeSection === "timetable" ? "active" : ""}`} onClick={() => setActiveSection("timetable")}>
+            <button
+              type="button"
+              className={`menu-item ${activeSection === "timetable" ? "active" : ""}`}
+              onClick={() => setActiveSection("timetable")}
+            >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
-                  <rect x="4" y="5" width="16" height="15" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M8 3.8v2.4M16 3.8v2.4M4 9h16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M8 12.5h2.5M13.5 12.5H16M8 16h2.5M13.5 16H16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <rect
+                    x="4"
+                    y="5"
+                    width="16"
+                    height="15"
+                    rx="2.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <path
+                    d="M8 3.8v2.4M16 3.8v2.4M4 9h16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M8 12.5h2.5M13.5 12.5H16M8 16h2.5M13.5 16H16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </span>
               <span className="menu-item-label">Timetable</span>
@@ -435,21 +630,40 @@ function Dashboard() {
         </aside>
 
         <div className="dash-content">
-
-          {/* ── DASHBOARD SECTION ───────────────────────────────────────── */}
+          {/* ── DASHBOARD SECTION ── */}
           {activeSection === "dashboard" && (
             <section className="dash-main-screen">
               <h1 className="dash-title">Dashboard</h1>
-              <p className="dash-date">{dayLabel}, {dateLabel}</p>
-
-              <section className="dash-box-grid" aria-label="Student attendance summary">
+              <p className="dash-date">
+                {dayLabel}, {dateLabel}
+              </p>
+              <section
+                className="dash-box-grid"
+                aria-label="Student attendance summary"
+              >
                 <div className="dash-box-btn subject-list-card">
                   <div className="dash-box-title">Subjects</div>
-                  <div className="subject-list" role="list" aria-label="Subject selector">
+                  <div className="subject-list" role="list">
                     {isLoadingTimetable ? (
-                      <p style={{ color: "#9ca3af", fontSize: "13px", padding: "8px" }}>Loading subjects...</p>
+                      <p
+                        style={{
+                          color: "#9ca3af",
+                          fontSize: "13px",
+                          padding: "8px",
+                        }}
+                      >
+                        Loading subjects...
+                      </p>
                     ) : subjects.length === 0 ? (
-                      <p style={{ color: "#9ca3af", fontSize: "13px", padding: "8px" }}>No subjects found. Upload your timetable first.</p>
+                      <p
+                        style={{
+                          color: "#9ca3af",
+                          fontSize: "13px",
+                          padding: "8px",
+                        }}
+                      >
+                        No subjects found. Upload your timetable first.
+                      </p>
                     ) : (
                       subjects.map((subject) => {
                         const isActive = selectedSubject === subject;
@@ -464,8 +678,9 @@ function Dashboard() {
                           >
                             <span>{subject}</span>
                             <span className="subject-list-count">
-                              {weeklySubjectData[subject]?.attendedLectures || 0}/
-                              {weeklySubjectData[subject]?.totalLectures || 0}
+                              {weeklySubjectData[subject]?.attendedLectures ||
+                                0}
+                              /{weeklySubjectData[subject]?.totalLectures || 0}
                             </span>
                           </button>
                         );
@@ -473,26 +688,27 @@ function Dashboard() {
                     )}
                   </div>
                 </div>
-
                 <button type="button" className="dash-box-btn">
                   <div className="dash-box-title">Total Lectures</div>
                   <div className="dash-box-content">{totalLectures}</div>
                 </button>
-
                 <button type="button" className="dash-box-btn">
                   <div className="dash-box-title">Attended</div>
                   <div className="dash-box-content">{attendedLectures}</div>
                 </button>
               </section>
-
-              <section className="dash-chart-card" aria-label="Weekly attendance chart">
+              <section className="dash-chart-card">
                 <h2 className="dash-chart-title">
-                  {selectedSubject ? `${selectedSubject} Attendance` : "Weekly Attendance"}
+                  {selectedSubject
+                    ? `${selectedSubject} Attendance`
+                    : "Weekly Attendance"}
                 </h2>
                 <div className="dash-chart-wrap">
                   <div
                     className="attendance-ring"
-                    style={{ background: `conic-gradient(#22d3ee ${attendedPercent}%, #1e293b ${attendedPercent}% 100%)` }}
+                    style={{
+                      background: `conic-gradient(#22d3ee ${attendedPercent}%, #1e293b ${attendedPercent}% 100%)`,
+                    }}
                     role="img"
                     aria-label={`${selectedSubject || "Overall"} attendance: ${attendedPercent}%`}
                   >
@@ -501,136 +717,327 @@ function Dashboard() {
                     </div>
                   </div>
                   <div className="attendance-legend">
-                    <p><span className="legend-dot legend-attended" />Attended: {attendedLectures} classes ({attendedPercent}%)</p>
-                    <p><span className="legend-dot legend-missed" />Missed: {missedLectures} classes ({missedPercent}%)</p>
+                    <p>
+                      <span className="legend-dot legend-attended" />
+                      Attended: {attendedLectures} classes ({attendedPercent}%)
+                    </p>
+                    <p>
+                      <span className="legend-dot legend-missed" />
+                      Missed: {missedLectures} classes ({missedPercent}%)
+                    </p>
                   </div>
                 </div>
               </section>
             </section>
           )}
 
-          {/* ── ATTENDANCE SECTION ──────────────────────────────────────── */}
+          {/* ── ATTENDANCE SECTION ── */}
           {activeSection === "attendance" && (
-            <section className="dash-content-card attendance-view" aria-label="Weekly attendance timetable">
+            <section className="dash-content-card attendance-view">
               <div className="attendance-section-header">
                 <div>
-                  <h2 className="dash-section-title attendance-section-title">Attendance</h2>
+                  <h2 className="dash-section-title attendance-section-title">
+                    Attendance
+                  </h2>
                   <p className="dash-section-subtitle attendance-section-subtitle">
-                    Only today&apos;s row is active — use checkboxes to mark lectures attended.
+                    Only today's row is active — use checkboxes to mark lectures
+                    attended.
                   </p>
                 </div>
-                <div className="attendance-date-boxes" aria-label="Current date">
+                <div className="attendance-date-boxes">
                   <div className="attendance-date-box">
                     <span className="attendance-date-box-label">Month</span>
-                    <span className="attendance-date-box-value">{attendanceDateBoxes.month}</span>
+                    <span className="attendance-date-box-value">
+                      {attendanceDateBoxes.month}
+                    </span>
                   </div>
                   <div className="attendance-date-box">
                     <span className="attendance-date-box-label">Day</span>
-                    <span className="attendance-date-box-value">{attendanceDateBoxes.day}</span>
+                    <span className="attendance-date-box-value">
+                      {attendanceDateBoxes.day}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {isLoadingTimetable ? (
-                <p style={{ color: "#9ca3af", padding: "20px" }}>Loading timetable...</p>
+                <p style={{ color: "#9ca3af", padding: "20px" }}>
+                  Loading timetable...
+                </p>
               ) : timetableWeek.length === 0 ? (
-                <p style={{ color: "#9ca3af", padding: "20px" }}>No timetable found. Please upload your timetable image first.</p>
+                <p style={{ color: "#9ca3af", padding: "20px" }}>
+                  No timetable found. Please upload your timetable image first.
+                </p>
               ) : (
                 <>
                   <div className="timetable-table-wrap attendance-table-wrap">
                     <table className="timetable-table attendance-table">
-                      <thead>
-                        <tr>
-                          <th scope="col" className="timetable-th-day">Day</th>
-                          <th scope="col">8:15 – 10:15</th>
-                          <th scope="col">10:30 – 11:30</th>
-                          <th scope="col">11:30 – 12:30</th>
-                          <th scope="col" className="timetable-th-lunch attendance-lunch-col">
-                            12:30 – 1:15<span className="timetable-lunch-sub">Lunch break</span>
-                          </th>
-                          <th scope="col">1:15 – 2:15</th>
-                          <th scope="col">2:15 – 3:15</th>
-                        </tr>
-                      </thead>
+                      <TableHead />
                       <tbody>
                         {timetableWeek.map((row, index) => {
                           const isCurrentDay = row.day === dayLabel;
+                          const isFriday = row.day === "Friday";
                           return (
-                            <tr key={row.day} className={isCurrentDay ? "attendance-tr-active" : "attendance-tr-inactive"}>
-                              <th scope="row" className="timetable-day-cell">{row.day}</th>
-                              {["s1", "s2", "s3"].map((field) => {
-                                const slotKey   = `${row.day}_${field}`;
-                                const checked   = !!slotAttendanceChecked[slotKey];
-                                const text      = row[field];
-                                const timeLabel = ATTENDANCE_SLOT_TIMES[field];
-                                return (
-                                  <td key={field}>
+                            <tr
+                              key={row.day}
+                              className={
+                                isCurrentDay
+                                  ? "attendance-tr-active"
+                                  : "attendance-tr-inactive"
+                              }
+                            >
+                              <th scope="row" className="timetable-day-cell">
+                                {row.day}
+                              </th>
+
+                              {/* s1 slot */}
+                              {isFriday ? (
+                                // Friday: s1 limited to 8:15-10:15 practical only
+                                <td
+                                  colSpan={1}
+                                  className="friday-practical-cell"
+                                >
+                                  {isCurrentDay ? (
+                                    <div className="attendance-slot-inner">
+                                      <span className="attendance-slot-time-label">
+                                        8:15 – 10:15 (Practical)
+                                      </span>
+                                      <label className="attendance-slot-label">
+                                        <input
+                                          type="checkbox"
+                                          className="attendance-slot-checkbox"
+                                          checked={
+                                            !!slotAttendanceChecked[
+                                              `${row.day}_s1`
+                                            ]
+                                          }
+                                          onChange={() =>
+                                            toggleSlotAttendance(row.day, "s1")
+                                          }
+                                        />
+                                        <span className="attendance-slot-text">
+                                          {row.s1 || "—"}
+                                        </span>
+                                      </label>
+                                    </div>
+                                  ) : (
+                                    <div className="attendance-slot-inner attendance-slot-inner--readonly">
+                                      <span className="attendance-slot-time-label attendance-slot-time-label--muted">
+                                        8:15 – 10:15 (Practical)
+                                      </span>
+                                      <span className="attendance-slot-text attendance-slot-readonly">
+                                        {row.s1 || "—"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                              ) : (
+                                // Normal days: s1, break col, s2, s3
+                                <>
+                                  <td>
                                     {isCurrentDay ? (
                                       <div className="attendance-slot-inner">
-                                        <span className="attendance-slot-time-label">{timeLabel}</span>
+                                        <span className="attendance-slot-time-label">
+                                          {ATTENDANCE_SLOT_TIMES.s1}
+                                        </span>
                                         <label className="attendance-slot-label">
                                           <input
                                             type="checkbox"
                                             className="attendance-slot-checkbox"
-                                            checked={checked}
-                                            onChange={() => toggleSlotAttendance(row.day, field)}
-                                            aria-label={`${timeLabel} — ${text} — attended`}
+                                            checked={
+                                              !!slotAttendanceChecked[
+                                                `${row.day}_s1`
+                                              ]
+                                            }
+                                            onChange={() =>
+                                              toggleSlotAttendance(
+                                                row.day,
+                                                "s1",
+                                              )
+                                            }
                                           />
-                                          <span className="attendance-slot-text">{text || "—"}</span>
+                                          <span className="attendance-slot-text">
+                                            {row.s1 || "—"}
+                                          </span>
                                         </label>
                                       </div>
                                     ) : (
                                       <div className="attendance-slot-inner attendance-slot-inner--readonly">
-                                        <span className="attendance-slot-time-label attendance-slot-time-label--muted">{timeLabel}</span>
-                                        <span className="attendance-slot-text attendance-slot-readonly">{text || "—"}</span>
+                                        <span className="attendance-slot-time-label attendance-slot-time-label--muted">
+                                          {ATTENDANCE_SLOT_TIMES.s1}
+                                        </span>
+                                        <span className="attendance-slot-text attendance-slot-readonly">
+                                          {row.s1 || "—"}
+                                        </span>
                                       </div>
                                     )}
                                   </td>
-                                );
-                              })}
+                                </>
+                              )}
+
+                              {/* Break column — rowspan on first row only */}
                               {index === 0 && (
-                                <td rowSpan={5} className="timetable-lunch-cell attendance-lunch-col">
-                                  <span className="timetable-lunch-inner">Lunch break<span className="timetable-lunch-time">12:30 – 1:15</span></span>
+                                <td
+                                  rowSpan={5}
+                                  className="timetable-break-cell"
+                                >
+                                  <span className="timetable-lunch-inner">
+                                    Break
+                                    <span className="timetable-lunch-time">
+                                      10:15 – 10:30
+                                    </span>
+                                  </span>
                                 </td>
                               )}
-                              {["a1", "a2"].map((field) => {
-                                const slotKey   = `${row.day}_${field}`;
-                                const checked   = !!slotAttendanceChecked[slotKey];
-                                const text      = row[field];
-                                const timeLabel = ATTENDANCE_SLOT_TIMES[field];
-                                return (
+
+                              {/* s2, s3 for non-Friday; s2 for Friday */}
+                              {isFriday && (
+                                <td>
+                                  {isCurrentDay ? (
+                                    <div className="attendance-slot-inner">
+                                      <span className="attendance-slot-time-label">
+                                        10:10 – 12:30 (Practical)
+                                      </span>
+                                      <label className="attendance-slot-label">
+                                        <input
+                                          type="checkbox"
+                                          className="attendance-slot-checkbox"
+                                          checked={
+                                            !!slotAttendanceChecked[
+                                              `${row.day}_s2`
+                                            ]
+                                          }
+                                          onChange={() =>
+                                            toggleSlotAttendance(row.day, "s2")
+                                          }
+                                        />
+                                        <span className="attendance-slot-text">
+                                          {row.s2 || "—"}
+                                        </span>
+                                      </label>
+                                    </div>
+                                  ) : (
+                                    <div className="attendance-slot-inner attendance-slot-inner--readonly">
+                                      <span className="attendance-slot-time-label attendance-slot-time-label--muted">
+                                        10:10 – 12:30 (Practical)
+                                      </span>
+                                      <span className="attendance-slot-text attendance-slot-readonly">
+                                        {row.s2 || "—"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                              )}
+                              {!isFriday &&
+                                ["s2", "s3"].map((field) => (
                                   <td key={field}>
                                     {isCurrentDay ? (
                                       <div className="attendance-slot-inner">
-                                        <span className="attendance-slot-time-label">{timeLabel}</span>
+                                        <span className="attendance-slot-time-label">
+                                          {ATTENDANCE_SLOT_TIMES[field]}
+                                        </span>
                                         <label className="attendance-slot-label">
                                           <input
                                             type="checkbox"
                                             className="attendance-slot-checkbox"
-                                            checked={checked}
-                                            onChange={() => toggleSlotAttendance(row.day, field)}
-                                            aria-label={`${timeLabel} — ${text} — attended`}
+                                            checked={
+                                              !!slotAttendanceChecked[
+                                                `${row.day}_${field}`
+                                              ]
+                                            }
+                                            onChange={() =>
+                                              toggleSlotAttendance(
+                                                row.day,
+                                                field,
+                                              )
+                                            }
                                           />
-                                          <span className="attendance-slot-text">{text || "—"}</span>
+                                          <span className="attendance-slot-text">
+                                            {row[field] || "—"}
+                                          </span>
                                         </label>
                                       </div>
                                     ) : (
                                       <div className="attendance-slot-inner attendance-slot-inner--readonly">
-                                        <span className="attendance-slot-time-label attendance-slot-time-label--muted">{timeLabel}</span>
-                                        <span className="attendance-slot-text attendance-slot-readonly">{text || "—"}</span>
+                                        <span className="attendance-slot-time-label attendance-slot-time-label--muted">
+                                          {ATTENDANCE_SLOT_TIMES[field]}
+                                        </span>
+                                        <span className="attendance-slot-text attendance-slot-readonly">
+                                          {row[field] || "—"}
+                                        </span>
                                       </div>
                                     )}
                                   </td>
-                                );
-                              })}
+                                ))}
+
+                              {/* Lunch column — rowspan on first row only */}
+                              {index === 0 && (
+                                <td
+                                  rowSpan={5}
+                                  className="timetable-lunch-cell attendance-lunch-col"
+                                >
+                                  <span className="timetable-lunch-inner">
+                                    Lunch break
+                                    <span className="timetable-lunch-time">
+                                      12:30 – 1:15
+                                    </span>
+                                  </span>
+                                </td>
+                              )}
+
+                              {/* a1, a2 */}
+                              {["a1", "a2"].map((field) => (
+                                <td key={field}>
+                                  {isCurrentDay ? (
+                                    <div className="attendance-slot-inner">
+                                      <span className="attendance-slot-time-label">
+                                        {ATTENDANCE_SLOT_TIMES[field]}
+                                      </span>
+                                      <label className="attendance-slot-label">
+                                        <input
+                                          type="checkbox"
+                                          className="attendance-slot-checkbox"
+                                          checked={
+                                            !!slotAttendanceChecked[
+                                              `${row.day}_${field}`
+                                            ]
+                                          }
+                                          onChange={() =>
+                                            toggleSlotAttendance(row.day, field)
+                                          }
+                                        />
+                                        <span className="attendance-slot-text">
+                                          {row[field] || "—"}
+                                        </span>
+                                      </label>
+                                    </div>
+                                  ) : (
+                                    <div className="attendance-slot-inner attendance-slot-inner--readonly">
+                                      <span className="attendance-slot-time-label attendance-slot-time-label--muted">
+                                        {ATTENDANCE_SLOT_TIMES[field]}
+                                      </span>
+                                      <span className="attendance-slot-text attendance-slot-readonly">
+                                        {row[field] || "—"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                              ))}
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
-
-                  <div style={{ marginTop: "20px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      marginTop: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <button
                       type="button"
                       className="tt-primary"
@@ -641,7 +1048,14 @@ function Dashboard() {
                       {isSaving ? "Saving..." : "Save Today's Attendance"}
                     </button>
                     {saveStatus && (
-                      <p style={{ margin: 0, fontSize: "13px", color: saveStatusType === "error" ? "#ef4444" : "#22c55e" }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "13px",
+                          color:
+                            saveStatusType === "error" ? "#ef4444" : "#22c55e",
+                        }}
+                      >
                         {saveStatus}
                       </p>
                     )}
@@ -651,16 +1065,19 @@ function Dashboard() {
             </section>
           )}
 
-          {/* ── TIMETABLE SECTION (editable dropdowns) ──────────────────── */}
+          {/* ── TIMETABLE SECTION ── */}
           {activeSection === "timetable" && (
-            <section className="dash-content-card timetable-view" aria-label="Timetable section">
+            <section className="dash-content-card timetable-view">
               <h2 className="dash-section-title">Timetable</h2>
               <p className="dash-section-subtitle">
-                Select subjects from the dropdown for each slot. Changes save automatically.
+                Select subjects from the dropdown for each slot. Changes save
+                automatically.
               </p>
 
               {isLoadingTimetable ? (
-                <p style={{ color: "#9ca3af", padding: "20px" }}>Loading timetable...</p>
+                <p style={{ color: "#9ca3af", padding: "20px" }}>
+                  Loading timetable...
+                </p>
               ) : subjectsList.length === 0 ? (
                 <p style={{ color: "#9ca3af", padding: "20px" }}>
                   No subjects found. Please upload your timetable image first.
@@ -668,58 +1085,121 @@ function Dashboard() {
               ) : (
                 <div className="timetable-table-wrap">
                   <table className="timetable-table">
-                    <thead>
-                      <tr>
-                        <th scope="col" className="timetable-th-day">Day</th>
-                        <th scope="col"><span className="timetable-time">8:15 – 10:15</span></th>
-                        <th scope="col"><span className="timetable-time">10:30 – 11:30</span></th>
-                        <th scope="col"><span className="timetable-time">11:30 – 12:30</span></th>
-                        <th scope="col" className="timetable-th-lunch">
-                          12:30 – 1:15<span className="timetable-lunch-sub">Lunch break</span>
-                        </th>
-                        <th scope="col"><span className="timetable-time">1:15 – 2:15</span></th>
-                        <th scope="col"><span className="timetable-time">2:15 – 3:15</span></th>
-                      </tr>
-                    </thead>
+                    <TableHead />
                     <tbody>
-                      {timetableDetailed.map((row, index) => (
-                        <tr key={row.day}>
-                          <th scope="row" className="timetable-day-cell">{row.day}</th>
-                          {["s1", "s2", "s3"].map((slotKey) => (
-                            <td key={slotKey}>
+                      {timetableDetailed.map((row, index) => {
+                        const isFriday = row.day === "Friday";
+                        return (
+                          <tr key={row.day}>
+                            <th scope="row" className="timetable-day-cell">
+                              {row.day}
+                            </th>
+
+                            {/* s1 */}
+                            <td
+                              className={
+                                isFriday ? "friday-practical-cell" : ""
+                              }
+                            >
                               <SlotDropdown
                                 day={row.day}
-                                slotKey={slotKey}
-                                currentSubjectId={row[slotKey]?.subject_id ?? null}
+                                slotKey="s1"
+                                currentSubjectId={row["s1"]?.subject_id ?? null}
                               />
+                              {isFriday && (
+                                <span
+                                  style={{
+                                    fontSize: "10px",
+                                    color: "var(--text-muted)",
+                                    display: "block",
+                                    marginTop: "4px",
+                                  }}
+                                >
+                                  8:15 - 10:15 (Practical)
+                                </span>
+                              )}
                             </td>
-                          ))}
-                          {index === 0 && (
-                            <td rowSpan={5} className="timetable-lunch-cell">
-                              <span className="timetable-lunch-inner">
-                                Lunch break
-                                <span className="timetable-lunch-time">12:30 – 1:15</span>
-                              </span>
-                            </td>
-                          )}
-                          {["a1", "a2"].map((slotKey) => (
-                            <td key={slotKey}>
-                              <SlotDropdown
-                                day={row.day}
-                                slotKey={slotKey}
-                                currentSubjectId={row[slotKey]?.subject_id ?? null}
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
+
+                            {/* Break — rowspan on first row only */}
+                            {index === 0 && (
+                              <td rowSpan={5} className="timetable-break-cell">
+                                <span className="timetable-lunch-inner">
+                                  Break
+                                  <span className="timetable-lunch-time">
+                                    10:15 – 10:30
+                                  </span>
+                                </span>
+                              </td>
+                            )}
+
+                            {/* s2, s3 */}
+                            {isFriday ? (
+                              <td colSpan={2} className="friday-practical-cell">
+                                <SlotDropdown
+                                  day={row.day}
+                                  slotKey="s2"
+                                  currentSubjectId={
+                                    row["s2"]?.subject_id ?? null
+                                  }
+                                />
+                                <span
+                                  style={{
+                                    fontSize: "10px",
+                                    color: "var(--text-muted)",
+                                    display: "block",
+                                    marginTop: "4px",
+                                  }}
+                                >
+                                  10:30 - 12:30 (Practical)
+                                </span>
+                              </td>
+                            ) : (
+                              ["s2", "s3"].map((slotKey) => (
+                                <td key={slotKey}>
+                                  <SlotDropdown
+                                    day={row.day}
+                                    slotKey={slotKey}
+                                    currentSubjectId={
+                                      row[slotKey]?.subject_id ?? null
+                                    }
+                                  />
+                                </td>
+                              ))
+                            )}
+
+                            {/* Lunch — rowspan on first row only */}
+                            {index === 0 && (
+                              <td rowSpan={5} className="timetable-lunch-cell">
+                                <span className="timetable-lunch-inner">
+                                  Lunch break
+                                  <span className="timetable-lunch-time">
+                                    12:30 – 1:15
+                                  </span>
+                                </span>
+                              </td>
+                            )}
+
+                            {/* a1, a2 */}
+                            {["a1", "a2"].map((slotKey) => (
+                              <td key={slotKey}>
+                                <SlotDropdown
+                                  day={row.day}
+                                  slotKey={slotKey}
+                                  currentSubjectId={
+                                    row[slotKey]?.subject_id ?? null
+                                  }
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </section>
           )}
-
         </div>
       </div>
 
@@ -729,7 +1209,9 @@ function Dashboard() {
         aria-label="Toggle sidebar"
         onClick={() => setSidebarOpen((prev) => !prev)}
       >
-        <span /><span /><span />
+        <span />
+        <span />
+        <span />
       </button>
     </div>
   );

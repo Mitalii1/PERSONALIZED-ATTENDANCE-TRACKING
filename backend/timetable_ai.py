@@ -27,10 +27,30 @@ except Exception as e:
 
 # ── Junk entries that are never subjects ─────────────────────────────────────
 JUNK = {
-    "LIBRARY", "COUNSELLING", "BATCH COUNSELLING", "BREAK",
-    "MINOR", "VSB", "BATCH", "SND", "SNZ", "BSZ",
-    "GFM", "FKS", "NKS", "MPN", "AGS", "SBT",
-    "TGM", "PS", "AC", "ETC", "ELEC", "INTSTR", "CCRP", "DT",
+    "LIBRARY",
+    "COUNSELLING",
+    "BATCH COUNSELLING",
+    "BREAK",
+    "MINOR",
+    "VSB",
+    "BATCH",
+    "SND",
+    "SNZ",
+    "BSZ",
+    "GFM",
+    "FKS",
+    "NKS",
+    "MPN",
+    "AGS",
+    "SBT",
+    "TGM",
+    "PS",
+    "AC",
+    "ETC",
+    "ELEC",
+    "INTSTR",
+    "CCRP",
+    "DT",
 }
 
 STAFF_PATTERN = re.compile(r"\b(Mrs|Mr|Dr|Prof)\.?\s+\w+", re.IGNORECASE)
@@ -44,7 +64,7 @@ def clean_abbreviations(abbreviations: list) -> list:
     cleaned = []
     for item in abbreviations:
         short = item.get("short", "").strip()
-        full  = item.get("full",  "").strip()
+        full = item.get("full", "").strip()
         type_ = item.get("type", "Theory")
 
         if not short or is_junk(short) or len(short) <= 1:
@@ -76,20 +96,56 @@ def extract_subjects_from_image(image_bytes: bytes, batch: str = None) -> dict:
         print(f"Using MOCK_MODE for batch {batch}")
         return {
             "abbreviations": [
-                {"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"},
-                {"short": "PROGG", "full": "Programming in Java",                     "type": "Theory"},
-                {"short": "DCCN",  "full": "Data Communication and Computer Network", "type": "Theory"},
-                {"short": "AMCS",  "full": "Applied Mathematics & Computational Statistics", "type": "Theory"},
-                {"short": "SEM",   "full": "Seminar",                                 "type": "Theory"},
-                {"short": "CNL",   "full": "Computer Networks Lab",                   "type": "Practical"},
-                {"short": "PDL",   "full": "PDL Practical",                           "type": "Practical"},
+                {
+                    "short": "ADASL",
+                    "full": "Advanced Data Structures and Algorithms",
+                    "type": "Theory",
+                },
+                {"short": "PROGG", "full": "Programming in Java", "type": "Theory"},
+                {
+                    "short": "DCCN",
+                    "full": "Data Communication and Computer Network",
+                    "type": "Theory",
+                },
+                {
+                    "short": "AMCS",
+                    "full": "Applied Mathematics & Computational Statistics",
+                    "type": "Theory",
+                },
+                {"short": "SEM", "full": "Seminar", "type": "Theory"},
+                {"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"},
+                {"short": "PDL", "full": "PDL Practical", "type": "Practical"},
             ],
             "schedule": {
-                "Monday":    ["S1-ADASL-MPN-503",       "PROGG IN JAVA AGS 505", "SEM SNZ 505",   "CCRP 505",           "MINOR"],
-                "Tuesday":   ["S1-ADASL-MPN-503",       "SEM SNZ 505",           "ADS MPN 505",   "LIBRARY",            "MINOR"],
-                "Wednesday": ["S1-PROGG IN JAVA-AGS-508","ADS MPN 505",           "DCCN SBT 505",  "SEM SNZ 505",        "AMCS NKS 505"],
-                "Thursday":  ["S1-PROGG IN JAVA-AGS-508","DCCN SBT 505",          "AMCS NKS 505",  "BATCH COUNSELLING",  "MINOR"],
-                "Friday":    ["S1-CNL-SBT-507",          "S1-PDL-I-TGM-502"],
+                "Monday": [
+                    "S1-ADASL-MPN-503",
+                    "PROGG IN JAVA AGS 505",
+                    "SEM SNZ 505",
+                    "CCRP 505",
+                    "MINOR",
+                ],
+                "Tuesday": [
+                    "S1-ADASL-MPN-503",
+                    "SEM SNZ 505",
+                    "ADS MPN 505",
+                    "LIBRARY",
+                    "MINOR",
+                ],
+                "Wednesday": [
+                    "S1-PROGG IN JAVA-AGS-508",
+                    "ADS MPN 505",
+                    "DCCN SBT 505",
+                    "SEM SNZ 505",
+                    "AMCS NKS 505",
+                ],
+                "Thursday": [
+                    "S1-PROGG IN JAVA-AGS-508",
+                    "DCCN SBT 505",
+                    "AMCS NKS 505",
+                    "BATCH COUNSELLING",
+                    "MINOR",
+                ],
+                "Friday": ["S1-CNL-SBT-507", "S1-PDL-I-TGM-502"],
             },
             "raw_text": "Mock timetable for S1 batch",
         }
@@ -135,7 +191,7 @@ OUTPUT RULES — VERY IMPORTANT:
 - Do NOT add any explanation, steps, or commentary
 - Start your response with {{ and end with }}
 
-{{"abbreviations": [{{"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"}}, {{"short": "PROGG", "full": "Programming in Java", "type": "Theory"}}, {{"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}}, {{"short": "PDL", "full": "PDL Practical", "type": "Practical"}}, {{"short": "DCCN", "full": "Data Communication and Computer Networks", "type": "Theory"}}, {{"short": "AMCS", "full": "Applied Mathematics and Computational Statistics", "type": "Theory"}}, {{"short": "SEM", "full": "Seminar", "type": "Theory"}}], "schedule": {{"Monday": ["S1-ADASL-MPN-503", "PROGG IN JAVA AGS 505", "SEM SNZ 505", "CCRP 505", "MINOR"], "Tuesday": ["S1-ADASL-MPN-503", "SEM SNZ 505", "ADS MPN 505", "LIBRARY", "MINOR"], "Wednesday": ["S1-PROGG IN JAVA-AGS-508", "ADS MPN 505", "DCCN SBT 505", "SEM SNZ 505", "AMCS NKS 505"], "Thursday": ["S1-PROGG IN JAVA-AGS-508", "DCCN SBT 505", "AMCS NKS 505", "BATCH COUNSELLING", "MINOR"], "Friday": ["S1-CNL-SBT-507", "S1-PDL-I-TGM-502", "AMCS NKS 505", "DT FKS 505", "DT FKS 505"]}}, "raw_text": "full raw text from image"}}
+{{"abbreviations": [{{"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"}}, {{"short": "PROGG", "full": "Programming in Java", "type": "Theory"}}, {{"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}}, {{"short": "PDL", "full": "PDL Practical", "type": "Practical"}}, {{"short": "DCCN", "full": "Data Communication and Computer Networks", "type": "Theory"}}, {{"short": "AMCS", "full": "Applied Mathematics and Computational Statistics", "type": "Theory"}}, {{"short": "SEM", "full": "Seminar", "type": "Theory"}}], "schedule": {{"Monday": ["S1-ADASL-MPN-503", "PROGG IN JAVA AGS 505", "SEM SNZ 505", "CCRP 505", "MINOR"], "Tuesday": ["S1-ADASL-MPN-503", "SEM SNZ 505", "ADS MPN 505", "LIBRARY", "MINOR"], "Wednesday": ["S1-PROGG IN JAVA-AGS-508", "ADS MPN 505", "DCCN SBT 505", "SEM SNZ 505", "AMCS NKS 505"], "Thursday": ["S1-PROGG IN JAVA-AGS-508", "DCCN SBT 505", "AMCS NKS 505", "BATCH COUNSELLING", "MINOR"], "Friday": ["S1-CNL-SBT-507", "S1-PDL-I-TGM-502"]}}, "raw_text": "full raw text from image"}}
 
 Replace ALL example values with actual data from the image."""
 
@@ -177,8 +233,8 @@ Replace ALL example values with actual data from the image."""
 
     # Attempt 1: strip ```json fences then parse directly
     try:
-        clean = re.sub(r'```json\s*', '', raw)
-        clean = re.sub(r'```\s*', '', clean)
+        clean = re.sub(r"```json\s*", "", raw)
+        clean = re.sub(r"```\s*", "", clean)
         clean = clean.strip()
         parsed = json.loads(clean)
     except json.JSONDecodeError:
@@ -186,7 +242,7 @@ Replace ALL example values with actual data from the image."""
 
     # Attempt 2: extract first { ... } block from anywhere in response
     if not parsed:
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
         if match:
             try:
                 parsed = json.loads(match.group())
@@ -196,8 +252,8 @@ Replace ALL example values with actual data from the image."""
     # Attempt 3: unescape unicode then extract JSON block
     if not parsed:
         try:
-            unescaped = raw.encode().decode('unicode_escape')
-            match = re.search(r'\{.*\}', unescaped, re.DOTALL)
+            unescaped = raw.encode().decode("unicode_escape")
+            match = re.search(r"\{.*\}", unescaped, re.DOTALL)
             if match:
                 parsed = json.loads(match.group())
         except Exception:
@@ -211,23 +267,26 @@ Replace ALL example values with actual data from the image."""
                 match = re.search(r"-\s*([A-Z]+)\s*=\s*(.+)", line)
                 if match:
                     short = match.group(1).strip()
-                    full  = match.group(2).strip().rstrip("()")
+                    full = match.group(2).strip().rstrip("()")
                     is_practical = any(
-                        x in full.upper() for x in ["LAB", "PRACTICAL", "PDL", "-I", "-II"]
+                        x in full.upper()
+                        for x in ["LAB", "PRACTICAL", "PDL", "-I", "-II"]
                     )
                     type_ = "Practical" if is_practical else "Theory"
                     if not is_junk(short):
-                        abbreviations.append({"short": short, "full": full, "type": type_})
+                        abbreviations.append(
+                            {"short": short, "full": full, "type": type_}
+                        )
 
             if abbreviations:
                 parsed = {
                     "abbreviations": abbreviations,
                     "schedule": {
-                        "Monday":    [a["short"] for a in abbreviations[:3]],
-                        "Tuesday":   [a["short"] for a in abbreviations[:3]],
+                        "Monday": [a["short"] for a in abbreviations[:3]],
+                        "Tuesday": [a["short"] for a in abbreviations[:3]],
                         "Wednesday": [a["short"] for a in abbreviations[1:4]],
-                        "Thursday":  [a["short"] for a in abbreviations[:3]],
-                        "Friday":    [a["short"] for a in abbreviations[1:4]],
+                        "Thursday": [a["short"] for a in abbreviations[:3]],
+                        "Friday": [a["short"] for a in abbreviations[1:4]],
                     },
                     "raw_text": raw,
                 }
