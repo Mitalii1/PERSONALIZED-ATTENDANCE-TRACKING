@@ -24,6 +24,10 @@ function Dashboard() {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
+  const [selectedHeatmapDay, setSelectedHeatmapDay] = useState("");
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [compactTables, setCompactTables] = useState(false);
+  const [liveClock, setLiveClock] = useState(new Date());
 
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(true);
   const [attendanceSummary, setAttendanceSummary] = useState([]);
@@ -186,6 +190,14 @@ function Dashboard() {
     return Array.from(set).sort();
   }, [timetableWeek]);
 
+  const filteredSubjects = useMemo(() => {
+    const query = subjectSearch.trim().toLowerCase();
+    if (!query) return subjects;
+    return subjects.filter((subject) =>
+      subject.toLowerCase().includes(query),
+    );
+  }, [subjects, subjectSearch]);
+
   const [slotAttendanceChecked, setSlotAttendanceChecked] = useState({});
 
   const timetableSubjectTotals = useMemo(() => {
@@ -296,12 +308,22 @@ function Dashboard() {
         );
   const missedPercent = 100 - attendedPercent;
 
-  const now = new Date();
-  const dayLabel = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dateLabel = now.toLocaleDateString("en-US", {
+  useEffect(() => {
+    const timer = setInterval(() => setLiveClock(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const dayLabel = liveClock.toLocaleDateString("en-US", {
+    weekday: "long",
+  });
+  const dateLabel = liveClock.toLocaleDateString("en-US", {
     day: "numeric",
     month: "long",
     year: "numeric",
+  });
+  const timeLabel = liveClock.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   const attendanceDateBoxes = useMemo(() => {
@@ -325,6 +347,18 @@ function Dashboard() {
     const possible = Math.floor(attendedLectures / 0.75 - totalLectures);
     return possible > 0 ? possible : 0;
   }, [totalLectures, attendedLectures]);
+
+  const targetProgressPercent = useMemo(() => {
+    if (totalLectures === 0) return 0;
+    return Math.min(100, Math.round((attendedPercent / ATTENDANCE_TARGET) * 100));
+  }, [totalLectures, attendedPercent]);
+
+  const greetingText = useMemo(() => {
+    const hour = liveClock.getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  }, [liveClock]);
 
   const riskSubjects = useMemo(() => {
     return subjects
@@ -355,7 +389,7 @@ function Dashboard() {
       .filter((item) => item.subject);
   }, [todayRow]);
 
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = liveClock.getHours() * 60 + liveClock.getMinutes();
   const slotStartMinutes = {
     s1: 8 * 60 + 15,
     s2: 10 * 60 + 30,
@@ -375,6 +409,37 @@ function Dashboard() {
     }
     return null;
   }, [todayRow, nowMinutes]);
+
+  const weeklyHeatmap = useMemo(() => {
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    return days.map((day) => {
+      const row = timetableWeek.find((item) => item.day === day);
+      const total = row
+        ? ["s1", "s2", "s3", "a1", "a2"].filter((slot) => !!row[slot]).length
+        : 0;
+      return {
+        day,
+        total,
+        intensity: Math.min(1, total / 5),
+      };
+    });
+  }, [timetableWeek]);
+
+  useEffect(() => {
+    if (!selectedHeatmapDay) {
+      setSelectedHeatmapDay(dayLabel);
+    }
+  }, [selectedHeatmapDay, dayLabel]);
+
+  const selectedHeatmapData = useMemo(
+    () => weeklyHeatmap.find((item) => item.day === selectedHeatmapDay) || null,
+    [weeklyHeatmap, selectedHeatmapDay],
+  );
+
+  const busiestHeatmapDay = useMemo(() => {
+    if (weeklyHeatmap.length === 0) return null;
+    return [...weeklyHeatmap].sort((a, b) => b.total - a.total)[0];
+  }, [weeklyHeatmap]);
 
   const toggleSlotAttendance = (day, field) => {
     if (day !== dayLabel) return;
@@ -699,10 +764,12 @@ function Dashboard() {
             <section className="dash-main-screen">
               <section className="dash-hero-card">
                 <div>
+                  <p className="dash-greeting">{greetingText}</p>
                   <h1 className="dash-title">Dashboard</h1>
                   <p className="dash-date">
                     {dayLabel}, {dateLabel}
                   </p>
+                  <p className="dash-live-time">Local time: {timeLabel}</p>
                   <p className="dash-focus-chip">
                     Focus: {selectedSubject || "Overall attendance"}
                   </p>
@@ -729,6 +796,13 @@ function Dashboard() {
                   >
                     Clear Focus
                   </button>
+                  <button
+                    type="button"
+                    className={`dash-chip-btn ${compactTables ? "dash-chip-btn--active" : ""}`}
+                    onClick={() => setCompactTables((prev) => !prev)}
+                  >
+                    {compactTables ? "Comfort View" : "Compact View"}
+                  </button>
                 </div>
               </section>
 
@@ -738,6 +812,15 @@ function Dashboard() {
               >
                 <div className="dash-box-btn subject-list-card">
                   <div className="dash-box-title">Subjects</div>
+                  <div className="subject-search-wrap">
+                    <input
+                      className="subject-search-input"
+                      type="text"
+                      value={subjectSearch}
+                      onChange={(e) => setSubjectSearch(e.target.value)}
+                      placeholder="Search subjects"
+                    />
+                  </div>
                   <div className="subject-list" role="list">
                     {isLoadingTimetable ? (
                       <p
@@ -749,7 +832,7 @@ function Dashboard() {
                       >
                         Loading subjects...
                       </p>
-                    ) : subjects.length === 0 ? (
+                    ) : filteredSubjects.length === 0 ? (
                       <p
                         style={{
                           color: "#9ca3af",
@@ -757,10 +840,10 @@ function Dashboard() {
                           padding: "8px",
                         }}
                       >
-                        No subjects found. Upload your timetable first.
+                        No subjects match your search.
                       </p>
                     ) : (
-                      subjects.map((subject) => {
+                      filteredSubjects.map((subject) => {
                         const isActive = selectedSubject === subject;
                         return (
                           <button
@@ -783,14 +866,20 @@ function Dashboard() {
                     )}
                   </div>
                 </div>
-                <button type="button" className="dash-box-btn dash-box-btn--stat">
+                <button
+                  type="button"
+                  className="dash-box-btn dash-box-btn--stat"
+                >
                   <div className="dash-box-title">Attendance</div>
                   <div className="dash-box-content">{attendedPercent}%</div>
                   <p className="dash-card-subline">
                     {attendedLectures}/{totalLectures} lectures attended
                   </p>
                 </button>
-                <button type="button" className="dash-box-btn dash-box-btn--stat">
+                <button
+                  type="button"
+                  className="dash-box-btn dash-box-btn--stat"
+                >
                   <div className="dash-box-title">Goal Tracker</div>
                   <div className="dash-box-content">
                     {classesNeededForTarget > 0
@@ -810,6 +899,18 @@ function Dashboard() {
                     ? `${selectedSubject} Attendance`
                     : "Weekly Attendance"}
                 </h2>
+                <div className="dash-target-progress">
+                  <div className="dash-target-progress-head">
+                    <span>Target Progress (75%)</span>
+                    <span>{targetProgressPercent}%</span>
+                  </div>
+                  <div className="dash-target-progress-track">
+                    <span
+                      className="dash-target-progress-fill"
+                      style={{ width: `${targetProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
                 <div className="dash-chart-wrap">
                   <div
                     className="attendance-ring"
@@ -860,7 +961,9 @@ function Dashboard() {
                           role="listitem"
                         >
                           <span className="dash-plan-time">{item.time}</span>
-                          <span className="dash-plan-subject">{item.subject}</span>
+                          <span className="dash-plan-subject">
+                            {item.subject}
+                          </span>
                         </button>
                       ))
                     )}
@@ -892,12 +995,50 @@ function Dashboard() {
                           role="listitem"
                         >
                           <span className="dash-risk-name">{item.name}</span>
-                          <span className="dash-risk-badge">{item.percent}%</span>
+                          <span className="dash-risk-badge">
+                            {item.percent}%
+                          </span>
                         </button>
                       ))
                     )}
                   </div>
                 </article>
+              </section>
+
+              <section className="dash-heatmap-card">
+                <div className="dash-heatmap-head">
+                  <h3 className="dash-insight-title">Weekly Load Heatmap</h3>
+                  <span className="dash-heatmap-note">Frontend preview</span>
+                </div>
+
+                <div className="dash-heatmap-grid" role="list">
+                  {weeklyHeatmap.map((item) => (
+                    <button
+                      key={item.day}
+                      type="button"
+                      role="listitem"
+                      className={`dash-heatmap-cell ${
+                        selectedHeatmapDay === item.day ? "dash-heatmap-cell--active" : ""
+                      }`}
+                      style={{
+                        background: `linear-gradient(145deg, rgba(30, 41, 59, 0.75), rgba(34, 211, 238, ${0.12 + item.intensity * 0.45}))`,
+                      }}
+                      onClick={() => setSelectedHeatmapDay(item.day)}
+                    >
+                      <span className="dash-heatmap-day">{item.day.slice(0, 3)}</span>
+                      <span className="dash-heatmap-value">{item.total}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="dash-heatmap-meta">
+                  <p>
+                    Selected: {selectedHeatmapData?.day || "-"} ({selectedHeatmapData?.total || 0} classes)
+                  </p>
+                  <p>
+                    Peak day: {busiestHeatmapDay?.day || "-"} ({busiestHeatmapDay?.total || 0} classes)
+                  </p>
+                </div>
               </section>
             </section>
           )}
@@ -949,8 +1090,16 @@ function Dashboard() {
                 </p>
               ) : (
                 <>
-                  <div className="timetable-table-wrap attendance-table-wrap">
-                    <table className="timetable-table attendance-table">
+                  <div
+                    className={`timetable-table-wrap attendance-table-wrap ${
+                      compactTables ? "table-wrap-compact" : ""
+                    }`}
+                  >
+                    <table
+                      className={`timetable-table attendance-table ${
+                        compactTables ? "timetable-table-compact" : ""
+                      }`}
+                    >
                       <TableHead />
                       <tbody>
                         {timetableWeek.map((row, index) => {
@@ -1250,6 +1399,13 @@ function Dashboard() {
                     Subjects: {subjectsList.length}
                   </span>
                   <span className="timetable-header-pill">Auto-save ON</span>
+                  <button
+                    type="button"
+                    className="timetable-header-pill timetable-pill-btn"
+                    onClick={() => setCompactTables((prev) => !prev)}
+                  >
+                    {compactTables ? "Comfort View" : "Compact View"}
+                  </button>
                 </div>
               </div>
 
@@ -1262,8 +1418,16 @@ function Dashboard() {
                   No subjects found. Please upload your timetable image first.
                 </p>
               ) : (
-                <div className="timetable-table-wrap">
-                  <table className="timetable-table">
+                <div
+                  className={`timetable-table-wrap ${
+                    compactTables ? "table-wrap-compact" : ""
+                  }`}
+                >
+                  <table
+                    className={`timetable-table ${
+                      compactTables ? "timetable-table-compact" : ""
+                    }`}
+                  >
                     <TableHead />
                     <tbody>
                       {timetableDetailed.map((row, index) => {
