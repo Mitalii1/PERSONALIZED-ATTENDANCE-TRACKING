@@ -20,6 +20,23 @@ const ATTENDANCE_SLOT_TIMES_DB = {
   a2: "2:15-3:15",
 };
 
+const SLOT_START_MINUTES = {
+  s1: 8 * 60 + 15,
+  s2: 10 * 60 + 30,
+  s3: 11 * 60 + 30,
+  a1: 13 * 60 + 15,
+  a2: 14 * 60 + 15,
+};
+
+const SIMULATED_DETECTED_SUBJECTS = [
+  "Advanced Data Structures and Algorithms",
+  "Programming in Java",
+  "Data Communication and Computer Network",
+  "Applied Mathematics and Computational Statistics",
+  "Computer Networks Lab",
+  "PDL Practical",
+];
+
 function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
   const userId = currentUser?.id;
   const userName = currentUser?.name || "Student";
@@ -67,7 +84,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
     removeTokens.forEach((token) => {
       normalized = normalized.replace(new RegExp(`\\b${token}\\b`, "gi"), "");
     });
-    normalized = normalized.replace(/[-\/]/g, " ").trim();
+    normalized = normalized.replace(/[-/]/g, " ").trim();
     normalized = normalized.replace(/\s+/g, " ").trim();
     if (!normalized) return null;
     return normalized;
@@ -408,20 +425,13 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
   }, [todayRow]);
 
   const nowMinutes = liveClock.getHours() * 60 + liveClock.getMinutes();
-  const slotStartMinutes = {
-    s1: 8 * 60 + 15,
-    s2: 10 * 60 + 30,
-    s3: 11 * 60 + 30,
-    a1: 13 * 60 + 15,
-    a2: 14 * 60 + 15,
-  };
 
   const nextClassToday = useMemo(() => {
     if (!todayRow) return null;
     for (const slot of ["s1", "s2", "s3", "a1", "a2"]) {
       const subject = todayRow[slot];
       if (!subject) continue;
-      if (slotStartMinutes[slot] >= nowMinutes) {
+      if (SLOT_START_MINUTES[slot] >= nowMinutes) {
         return { slot, subject, time: ATTENDANCE_SLOT_TIMES[slot] };
       }
     }
@@ -459,6 +469,151 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
     return [...weeklyHeatmap].sort((a, b) => b.total - a.total)[0];
   }, [weeklyHeatmap]);
 
+  const analyticsTrend = useMemo(() => {
+    const horizon = 6;
+    const a = overallAttended || 0;
+    const t = overallTotal || 0;
+    const rows = [];
+    for (let step = 0; step <= horizon; step += 1) {
+      const totalAtStep = t + step;
+      const attendPct =
+        totalAtStep === 0
+          ? 0
+          : Number((((a + step) / totalAtStep) * 100).toFixed(1));
+      const missPct =
+        totalAtStep === 0 ? 0 : Number(((a / totalAtStep) * 100).toFixed(1));
+      rows.push({
+        label: step === 0 ? "Now" : `+${step}`,
+        attendPct,
+        missPct,
+      });
+    }
+    return rows;
+  }, [overallAttended, overallTotal]);
+
+  const subjectRiskForecasts = useMemo(() => {
+    const upcomingToday = new Set(
+      todaySlots
+        .map((item) => normalizeSubject(item.subject))
+        .filter((item) => !!item),
+    );
+
+    return subjects
+      .map((sub) => {
+        const stats = weeklySubjectData[sub] || {};
+        const total = stats.totalLectures || 0;
+        const attended = stats.attendedLectures || 0;
+        if (total <= 0) return null;
+
+        const percent =
+          total === 0 ? 0 : Number(((attended / total) * 100).toFixed(1));
+        const needed = Math.max(0, 3 * total - 4 * attended);
+        const attendNext = Number((((attended + 1) / (total + 1)) * 100).toFixed(1));
+        const missNext = Number(((attended / (total + 1)) * 100).toFixed(1));
+        const deficit = Math.max(0, ATTENDANCE_TARGET - percent);
+        const urgencyScore =
+          needed * 9 + deficit * 2 + (upcomingToday.has(sub) ? 10 : 0);
+
+        let riskLevel = "Low";
+        if (percent < 60) riskLevel = "High";
+        else if (percent < ATTENDANCE_TARGET) riskLevel = "Medium";
+
+        return {
+          subject: sub,
+          total,
+          attended,
+          percent,
+          needed,
+          attendNext,
+          missNext,
+          riskLevel,
+          urgencyScore,
+          isTodayUpcoming: upcomingToday.has(sub),
+        };
+      })
+      .filter((item) => !!item)
+      .sort((a, b) => b.urgencyScore - a.urgencyScore);
+  }, [subjects, weeklySubjectData, todaySlots]);
+
+  const analyticsSuggestions = useMemo(() => {
+    const shortlist = subjectRiskForecasts
+      .filter((item) => item.needed > 0 || item.riskLevel !== "Low")
+      .slice(0, 4);
+
+    if (shortlist.length === 0) {
+      return [
+        {
+          subject: "Overall",
+          message: "You are currently on track. Prioritize consistency across all classes.",
+          level: "Low",
+          needed: 0,
+          tag: "Stable",
+        },
+      ];
+    }
+
+    return shortlist.map((item) => {
+      const attendHint =
+        item.needed > 0
+          ? `Attend next ${item.needed} classes to recover toward ${ATTENDANCE_TARGET}%.`
+          : "Maintain attendance streak to stay above target.";
+      const timingHint = item.isTodayUpcoming
+        ? "This subject appears in today's schedule."
+        : "Pick this subject in the next available slot.";
+
+      return {
+        subject: item.subject,
+        message: `${attendHint} ${timingHint}`,
+        level: item.riskLevel,
+        needed: item.needed,
+        tag: item.isTodayUpcoming ? "Today" : "Upcoming",
+      };
+    });
+  }, [subjectRiskForecasts]);
+
+  const analyticsChartModel = useMemo(() => {
+    if (analyticsTrend.length === 0) {
+      return {
+        attendPoints: "",
+        missPoints: "",
+        labels: [],
+        minY: 0,
+        maxY: 100,
+      };
+    }
+
+    const allValues = analyticsTrend.flatMap((p) => [p.attendPct, p.missPct]);
+    const rawMin = Math.max(0, Math.floor(Math.min(...allValues) - 3));
+    const rawMax = Math.min(100, Math.ceil(Math.max(...allValues) + 3));
+    const minY = rawMin;
+    const maxY = rawMax <= rawMin ? rawMin + 1 : rawMax;
+    const width = 720;
+    const height = 260;
+    const padX = 36;
+    const padY = 22;
+
+    const toPointString = (key) => {
+      return analyticsTrend
+        .map((point, idx) => {
+          const x =
+            padX +
+            ((width - padX * 2) * idx) / Math.max(1, analyticsTrend.length - 1);
+          const ratio = (point[key] - minY) / (maxY - minY);
+          const y = height - padY - ratio * (height - padY * 2);
+          return `${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(" ");
+    };
+
+    return {
+      attendPoints: toPointString("attendPct"),
+      missPoints: toPointString("missPct"),
+      labels: analyticsTrend,
+      minY,
+      maxY,
+    };
+  }, [analyticsTrend]);
+
   const toggleSlotAttendance = (day, field) => {
     if (day !== dayLabel) return;
     const key = `${day}_${field}`;
@@ -467,20 +622,11 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
 
   const handleSubjectSelect = (subject) => setSelectedSubject(subject);
 
-  const simulatedDetectedSubjects = [
-    "Advanced Data Structures and Algorithms",
-    "Programming in Java",
-    "Data Communication and Computer Network",
-    "Applied Mathematics and Computational Statistics",
-    "Computer Networks Lab",
-    "PDL Practical",
-  ];
-
   const runSimulatedUpload = useCallback(() => {
     setIsUploadLoading(true);
     setDetectedSubjects([]);
     setTimeout(() => {
-      setDetectedSubjects(simulatedDetectedSubjects);
+      setDetectedSubjects(SIMULATED_DETECTED_SUBJECTS);
       setIsUploadLoading(false);
     }, 1700);
   }, []);
@@ -798,6 +944,36 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
             </button>
             <button
               type="button"
+              className={`menu-item ${activeSection === "analytics" ? "active" : ""}`}
+              onClick={() => setActiveSection("analytics")}
+            >
+              <span className="menu-item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M4 18.5h16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M6 16l3.3-3.7 3.1 2.2 5.6-6.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="6" cy="16" r="1" fill="currentColor" />
+                  <circle cx="9.3" cy="12.3" r="1" fill="currentColor" />
+                  <circle cx="12.4" cy="14.5" r="1" fill="currentColor" />
+                  <circle cx="18" cy="8" r="1" fill="currentColor" />
+                </svg>
+              </span>
+              <span className="menu-item-label">Analytics</span>
+            </button>
+            <button
+              type="button"
               className={`menu-item ${activeSection === "ai-upload" ? "active" : ""}`}
               onClick={() => {
                 if (onGoToTimetable) {
@@ -987,7 +1163,6 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                             type="button"
                             className={`subject-list-item ${isActive ? "active" : ""}`}
                             onClick={() => handleSubjectSelect(subject)}
-                            role="listitem"
                             aria-pressed={isActive}
                           >
                             <span>{subject}</span>
@@ -1672,6 +1847,157 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                   </table>
                 </div>
               )}
+            </section>
+          )}
+
+          {/* ── ANALYTICS SECTION ── */}
+          {activeSection === "analytics" && (
+            <section className="dash-content-card analytics-view">
+              <div className="analytics-head">
+                <div>
+                  <h2 className="dash-section-title">Analytics</h2>
+                  <p className="dash-section-subtitle">
+                    Real projections from your live attendance and timetable data.
+                  </p>
+                </div>
+                <div className="analytics-summary-pill">
+                  Current Overall: {overallTotal > 0 ? `${Math.round((overallAttended / overallTotal) * 100)}%` : "0%"}
+                </div>
+              </div>
+
+              <article className="analytics-trend-card">
+                <div className="analytics-card-head">
+                  <h3>Attendance Trend Forecast</h3>
+                  <p>
+                    Green path assumes you attend upcoming classes; amber path assumes you miss them.
+                  </p>
+                </div>
+                <div className="analytics-chart-wrap" role="img" aria-label="Attendance trend forecast chart">
+                  <svg viewBox="0 0 720 260" className="analytics-trend-svg">
+                    <line x1="36" y1="22" x2="36" y2="238" className="analytics-axis" />
+                    <line x1="36" y1="238" x2="684" y2="238" className="analytics-axis" />
+                    <line x1="36" y1="130" x2="684" y2="130" className="analytics-grid" />
+                    <polyline
+                      points={analyticsChartModel.attendPoints}
+                      className="analytics-line analytics-line--attend"
+                    />
+                    <polyline
+                      points={analyticsChartModel.missPoints}
+                      className="analytics-line analytics-line--miss"
+                    />
+                    <line
+                      x1="36"
+                      x2="684"
+                      y1={
+                        238 -
+                        ((ATTENDANCE_TARGET - analyticsChartModel.minY) /
+                          Math.max(1, analyticsChartModel.maxY - analyticsChartModel.minY)) *
+                          216
+                      }
+                      y2={
+                        238 -
+                        ((ATTENDANCE_TARGET - analyticsChartModel.minY) /
+                          Math.max(1, analyticsChartModel.maxY - analyticsChartModel.minY)) *
+                          216
+                      }
+                      className="analytics-target-line"
+                    />
+                    {analyticsChartModel.labels.map((point, idx) => {
+                      const x = 36 + (648 * idx) / Math.max(1, analyticsChartModel.labels.length - 1);
+                      return (
+                        <text
+                          key={point.label}
+                          x={x}
+                          y="254"
+                          textAnchor="middle"
+                          className="analytics-label"
+                        >
+                          {point.label}
+                        </text>
+                      );
+                    })}
+                  </svg>
+                </div>
+                <div className="analytics-legend">
+                  <span><i className="analytics-dot analytics-dot--attend" /> Attend Next</span>
+                  <span><i className="analytics-dot analytics-dot--miss" /> Miss Next</span>
+                  <span><i className="analytics-dot analytics-dot--target" /> 75% Target</span>
+                </div>
+              </article>
+
+              <article className="analytics-risk-card">
+                <div className="analytics-card-head">
+                  <h3>Subject Risk Forecast</h3>
+                  <p>Forecasted impact if you attend or miss the next class in each subject.</p>
+                </div>
+                <div className="analytics-risk-table-wrap">
+                  <table className="analytics-risk-table">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        <th>Current</th>
+                        <th>If Attend Next</th>
+                        <th>If Miss Next</th>
+                        <th>Needed to Reach 75%</th>
+                        <th>Risk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjectRiskForecasts.slice(0, 8).map((item) => (
+                        <tr key={item.subject}>
+                          <td>{item.subject}</td>
+                          <td>{item.percent}%</td>
+                          <td className="analytics-green">{item.attendNext}%</td>
+                          <td className="analytics-amber">{item.missNext}%</td>
+                          <td>{item.needed}</td>
+                          <td>
+                            <span
+                              className={`analytics-risk-badge analytics-risk-${item.riskLevel.toLowerCase()}`}
+                            >
+                              {item.riskLevel}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article className="analytics-action-card">
+                <div className="analytics-card-head">
+                  <h3>What To Attend Next</h3>
+                  <p>Priority recommendations generated from urgency score and upcoming slots.</p>
+                </div>
+                <div className="analytics-action-list">
+                  {analyticsSuggestions.map((item) => (
+                    <button
+                      key={`${item.subject}-${item.tag}`}
+                      type="button"
+                      className="analytics-action-item"
+                      onClick={() => {
+                        if (item.subject !== "Overall") {
+                          setSelectedSubject(item.subject);
+                          setActiveSection("dashboard");
+                        }
+                      }}
+                    >
+                      <div>
+                        <p className="analytics-action-title">{item.subject}</p>
+                        <p className="analytics-action-message">{item.message}</p>
+                      </div>
+                      <div className="analytics-action-tags">
+                        <span className="analytics-tag">{item.tag}</span>
+                        <span
+                          className={`analytics-risk-badge analytics-risk-${String(item.level).toLowerCase()}`}
+                        >
+                          {item.level}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </article>
             </section>
           )}
 
