@@ -312,6 +312,70 @@ function Dashboard() {
     };
   }, []);
 
+  const ATTENDANCE_TARGET = 75;
+
+  const classesNeededForTarget = useMemo(() => {
+    if (totalLectures === 0) return 0;
+    const needed = 3 * totalLectures - 4 * attendedLectures;
+    return needed > 0 ? needed : 0;
+  }, [totalLectures, attendedLectures]);
+
+  const safeBunks = useMemo(() => {
+    if (totalLectures === 0) return 0;
+    const possible = Math.floor(attendedLectures / 0.75 - totalLectures);
+    return possible > 0 ? possible : 0;
+  }, [totalLectures, attendedLectures]);
+
+  const riskSubjects = useMemo(() => {
+    return subjects
+      .map((sub) => {
+        const stats = weeklySubjectData[sub] || {};
+        return {
+          name: sub,
+          total: stats.totalLectures || 0,
+          attended: stats.attendedLectures || 0,
+          percent: stats.attendedPercent || 0,
+        };
+      })
+      .filter((sub) => sub.total > 0 && sub.percent < ATTENDANCE_TARGET)
+      .sort((a, b) => a.percent - b.percent)
+      .slice(0, 4);
+  }, [subjects, weeklySubjectData]);
+
+  const todayRow = timetableWeek.find((r) => r.day === dayLabel) || null;
+
+  const todaySlots = useMemo(() => {
+    if (!todayRow) return [];
+    return ["s1", "s2", "s3", "a1", "a2"]
+      .map((slot) => ({
+        slot,
+        time: ATTENDANCE_SLOT_TIMES[slot],
+        subject: todayRow[slot],
+      }))
+      .filter((item) => item.subject);
+  }, [todayRow]);
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const slotStartMinutes = {
+    s1: 8 * 60 + 15,
+    s2: 10 * 60 + 30,
+    s3: 11 * 60 + 30,
+    a1: 13 * 60 + 15,
+    a2: 14 * 60 + 15,
+  };
+
+  const nextClassToday = useMemo(() => {
+    if (!todayRow) return null;
+    for (const slot of ["s1", "s2", "s3", "a1", "a2"]) {
+      const subject = todayRow[slot];
+      if (!subject) continue;
+      if (slotStartMinutes[slot] >= nowMinutes) {
+        return { slot, subject, time: ATTENDANCE_SLOT_TIMES[slot] };
+      }
+    }
+    return null;
+  }, [todayRow, nowMinutes]);
+
   const toggleSlotAttendance = (day, field) => {
     if (day !== dayLabel) return;
     const key = `${day}_${field}`;
@@ -633,10 +697,41 @@ function Dashboard() {
           {/* ── DASHBOARD SECTION ── */}
           {activeSection === "dashboard" && (
             <section className="dash-main-screen">
-              <h1 className="dash-title">Dashboard</h1>
-              <p className="dash-date">
-                {dayLabel}, {dateLabel}
-              </p>
+              <section className="dash-hero-card">
+                <div>
+                  <h1 className="dash-title">Dashboard</h1>
+                  <p className="dash-date">
+                    {dayLabel}, {dateLabel}
+                  </p>
+                  <p className="dash-focus-chip">
+                    Focus: {selectedSubject || "Overall attendance"}
+                  </p>
+                </div>
+                <div className="dash-hero-actions">
+                  <button
+                    type="button"
+                    className="dash-chip-btn"
+                    onClick={() => setActiveSection("attendance")}
+                  >
+                    Mark Today
+                  </button>
+                  <button
+                    type="button"
+                    className="dash-chip-btn"
+                    onClick={() => setActiveSection("timetable")}
+                  >
+                    Edit Timetable
+                  </button>
+                  <button
+                    type="button"
+                    className="dash-chip-btn"
+                    onClick={() => setSelectedSubject(null)}
+                  >
+                    Clear Focus
+                  </button>
+                </div>
+              </section>
+
               <section
                 className="dash-box-grid"
                 aria-label="Student attendance summary"
@@ -688,13 +783,25 @@ function Dashboard() {
                     )}
                   </div>
                 </div>
-                <button type="button" className="dash-box-btn">
-                  <div className="dash-box-title">Total Lectures</div>
-                  <div className="dash-box-content">{totalLectures}</div>
+                <button type="button" className="dash-box-btn dash-box-btn--stat">
+                  <div className="dash-box-title">Attendance</div>
+                  <div className="dash-box-content">{attendedPercent}%</div>
+                  <p className="dash-card-subline">
+                    {attendedLectures}/{totalLectures} lectures attended
+                  </p>
                 </button>
-                <button type="button" className="dash-box-btn">
-                  <div className="dash-box-title">Attended</div>
-                  <div className="dash-box-content">{attendedLectures}</div>
+                <button type="button" className="dash-box-btn dash-box-btn--stat">
+                  <div className="dash-box-title">Goal Tracker</div>
+                  <div className="dash-box-content">
+                    {classesNeededForTarget > 0
+                      ? `${classesNeededForTarget}`
+                      : `${safeBunks}`}
+                  </div>
+                  <p className="dash-card-subline">
+                    {classesNeededForTarget > 0
+                      ? "Classes needed to reach 75%"
+                      : "Safe bunk classes while staying at 75%"}
+                  </p>
                 </button>
               </section>
               <section className="dash-chart-card">
@@ -727,6 +834,70 @@ function Dashboard() {
                     </p>
                   </div>
                 </div>
+              </section>
+
+              <section className="dash-insights-grid">
+                <article className="dash-insight-card">
+                  <h3 className="dash-insight-title">Today Plan</h3>
+                  <p className="dash-insight-subtitle">
+                    {todaySlots.length > 0
+                      ? `${todaySlots.length} classes scheduled for ${dayLabel}`
+                      : "No classes scheduled today"}
+                  </p>
+                  <div className="dash-plan-list" role="list">
+                    {todaySlots.length === 0 ? (
+                      <p className="dash-empty-note">Enjoy your free day.</p>
+                    ) : (
+                      todaySlots.map((item) => (
+                        <button
+                          key={item.slot}
+                          type="button"
+                          className="dash-plan-item"
+                          onClick={() => {
+                            const normalized = normalizeSubject(item.subject);
+                            if (normalized) setSelectedSubject(normalized);
+                          }}
+                          role="listitem"
+                        >
+                          <span className="dash-plan-time">{item.time}</span>
+                          <span className="dash-plan-subject">{item.subject}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  {nextClassToday && (
+                    <div className="dash-next-class">
+                      Next: {nextClassToday.subject} ({nextClassToday.time})
+                    </div>
+                  )}
+                </article>
+
+                <article className="dash-insight-card">
+                  <h3 className="dash-insight-title">Risk Monitor</h3>
+                  <p className="dash-insight-subtitle">
+                    Subjects below {ATTENDANCE_TARGET}% target
+                  </p>
+                  <div className="dash-risk-list" role="list">
+                    {riskSubjects.length === 0 ? (
+                      <p className="dash-empty-note">
+                        Great work. No subject is below target.
+                      </p>
+                    ) : (
+                      riskSubjects.map((item) => (
+                        <button
+                          key={item.name}
+                          type="button"
+                          className="dash-risk-item"
+                          onClick={() => setSelectedSubject(item.name)}
+                          role="listitem"
+                        >
+                          <span className="dash-risk-name">{item.name}</span>
+                          <span className="dash-risk-badge">{item.percent}%</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </article>
               </section>
             </section>
           )}
