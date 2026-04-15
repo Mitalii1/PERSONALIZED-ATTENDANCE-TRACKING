@@ -508,7 +508,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
         const percent =
           total === 0 ? 0 : Number(((attended / total) * 100).toFixed(1));
         const needed = Math.max(0, 3 * total - 4 * attended);
-        const attendNext = Number((((attended + 1) / (total + 1)) * 100).toFixed(1));
+        const attendNext = Number(
+          (((attended + 1) / (total + 1)) * 100).toFixed(1),
+        );
         const missNext = Number(((attended / (total + 1)) * 100).toFixed(1));
         const deficit = Math.max(0, ATTENDANCE_TARGET - percent);
         const urgencyScore =
@@ -544,7 +546,8 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
       return [
         {
           subject: "Overall",
-          message: "You are currently on track. Prioritize consistency across all classes.",
+          message:
+            "You are currently on track. Prioritize consistency across all classes.",
           level: "Low",
           needed: 0,
           tag: "Stable",
@@ -1857,11 +1860,15 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                 <div>
                   <h2 className="dash-section-title">Analytics</h2>
                   <p className="dash-section-subtitle">
-                    Real projections from your live attendance and timetable data.
+                    Real projections from your live attendance and timetable
+                    data.
                   </p>
                 </div>
                 <div className="analytics-summary-pill">
-                  Current Overall: {overallTotal > 0 ? `${Math.round((overallAttended / overallTotal) * 100)}%` : "0%"}
+                  Current Overall:{" "}
+                  {overallTotal > 0
+                    ? `${Math.round((overallAttended / overallTotal) * 100)}%`
+                    : "0%"}
                 </div>
               </div>
 
@@ -1869,14 +1876,37 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                 <div className="analytics-card-head">
                   <h3>Attendance Trend Forecast</h3>
                   <p>
-                    Green path assumes you attend upcoming classes; amber path assumes you miss them.
+                    Green path assumes you attend upcoming classes; amber path
+                    assumes you miss them.
                   </p>
                 </div>
-                <div className="analytics-chart-wrap" role="img" aria-label="Attendance trend forecast chart">
+                <div
+                  className="analytics-chart-wrap"
+                  role="img"
+                  aria-label="Attendance trend forecast chart"
+                >
                   <svg viewBox="0 0 720 260" className="analytics-trend-svg">
-                    <line x1="36" y1="22" x2="36" y2="238" className="analytics-axis" />
-                    <line x1="36" y1="238" x2="684" y2="238" className="analytics-axis" />
-                    <line x1="36" y1="130" x2="684" y2="130" className="analytics-grid" />
+                    <line
+                      x1="36"
+                      y1="22"
+                      x2="36"
+                      y2="238"
+                      className="analytics-axis"
+                    />
+                    <line
+                      x1="36"
+                      y1="238"
+                      x2="684"
+                      y2="238"
+                      className="analytics-axis"
+                    />
+                    <line
+                      x1="36"
+                      y1="130"
+                      x2="684"
+                      y2="130"
+                      className="analytics-grid"
+                    />
                     <polyline
                       points={analyticsChartModel.attendPoints}
                       className="analytics-line analytics-line--attend"
@@ -1891,19 +1921,28 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                       y1={
                         238 -
                         ((ATTENDANCE_TARGET - analyticsChartModel.minY) /
-                          Math.max(1, analyticsChartModel.maxY - analyticsChartModel.minY)) *
+                          Math.max(
+                            1,
+                            analyticsChartModel.maxY - analyticsChartModel.minY,
+                          )) *
                           216
                       }
                       y2={
                         238 -
                         ((ATTENDANCE_TARGET - analyticsChartModel.minY) /
-                          Math.max(1, analyticsChartModel.maxY - analyticsChartModel.minY)) *
+                          Math.max(
+                            1,
+                            analyticsChartModel.maxY - analyticsChartModel.minY,
+                          )) *
                           216
                       }
                       className="analytics-target-line"
                     />
                     {analyticsChartModel.labels.map((point, idx) => {
-                      const x = 36 + (648 * idx) / Math.max(1, analyticsChartModel.labels.length - 1);
+                      const x =
+                        36 +
+                        (648 * idx) /
+                          Math.max(1, analyticsChartModel.labels.length - 1);
                       return (
                         <text
                           key={point.label}
@@ -1919,16 +1958,28 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                   </svg>
                 </div>
                 <div className="analytics-legend">
-                  <span><i className="analytics-dot analytics-dot--attend" /> Attend Next</span>
-                  <span><i className="analytics-dot analytics-dot--miss" /> Miss Next</span>
-                  <span><i className="analytics-dot analytics-dot--target" /> 75% Target</span>
+                  <span>
+                    <i className="analytics-dot analytics-dot--attend" /> Attend
+                    Next
+                  </span>
+                  <span>
+                    <i className="analytics-dot analytics-dot--miss" /> Miss
+                    Next
+                  </span>
+                  <span>
+                    <i className="analytics-dot analytics-dot--target" /> 75%
+                    Target
+                  </span>
                 </div>
               </article>
 
               <article className="analytics-risk-card">
                 <div className="analytics-card-head">
                   <h3>Subject Risk Forecast</h3>
-                  <p>Forecasted impact if you attend or miss the next class in each subject.</p>
+                  <p>
+                    Forecasted impact if you attend or miss the next class in
+                    each subject.
+                  </p>
                 </div>
                 <div className="analytics-risk-table-wrap">
                   <table className="analytics-risk-table">
@@ -1947,7 +1998,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                         <tr key={item.subject}>
                           <td>{item.subject}</td>
                           <td>{item.percent}%</td>
-                          <td className="analytics-green">{item.attendNext}%</td>
+                          <td className="analytics-green">
+                            {item.attendNext}%
+                          </td>
                           <td className="analytics-amber">{item.missNext}%</td>
                           <td>{item.needed}</td>
                           <td>
@@ -1967,7 +2020,10 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
               <article className="analytics-action-card">
                 <div className="analytics-card-head">
                   <h3>What To Attend Next</h3>
-                  <p>Priority recommendations generated from urgency score and upcoming slots.</p>
+                  <p>
+                    Priority recommendations generated from urgency score and
+                    upcoming slots.
+                  </p>
                 </div>
                 <div className="analytics-action-list">
                   {analyticsSuggestions.map((item) => (
@@ -1984,7 +2040,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                     >
                       <div>
                         <p className="analytics-action-title">{item.subject}</p>
-                        <p className="analytics-action-message">{item.message}</p>
+                        <p className="analytics-action-message">
+                          {item.message}
+                        </p>
                       </div>
                       <div className="analytics-action-tags">
                         <span className="analytics-tag">{item.tag}</span>
