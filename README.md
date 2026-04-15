@@ -1,6 +1,6 @@
 # 🎓 Personalized Attendance Tracking System
 
-**AI-Powered Personalized Attendance Tracking and Alert System for Students**
+**AI-assisted attendance tracking with timetable extraction, live dashboards, and actionable analytics for students.**
 
 [![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python)](https://www.python.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
@@ -13,566 +13,392 @@
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [What's New](#whats-new)
+- [Dashboard Sections](#dashboard-sections)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Installation & Setup](#installation--setup)
-- [Configuration](#configuration)
-- [Database Setup](#database-setup)
+- [Setup & Installation](#setup--installation)
 - [API Documentation](#api-documentation)
-- [Usage Guide](#usage-guide)
-- [Development](#development)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
+- [User Flow](#user-flow)
 - [License](#license)
 
 ---
 
 ## 📖 Overview
 
-A comprehensive, AI-powered web application designed to help students and educators efficiently track attendance. The system combines OCR technology with machine learning to automatically extract timetables from college schedule images and provides real-time attendance monitoring with statistical insights.
+A full-stack student attendance management platform combining AI-powered timetable extraction, interactive dashboards, and real-time analytics. Track subjects, mark attendance, view trends, and get actionable recommendations on which classes to prioritize.
 
-Perfect for educational institutions looking to automate attendance tracking and improve student accountability.
+---
+
+## ✨ What's New
+
+### Recent Additions
+
+- **Database-backed authentication** with hashed passwords (Werkzeug)
+- **Persistent user sessions** stored in frontend localStorage
+- **Authenticated API calls** using real user IDs
+- **New Analytics section** with:
+  - Attendance trend forecast chart
+  - Subject-level risk forecasts
+  - Actionable "what to attend next" suggestions
+- **Timetable slot editing** with auto-save
+- **User personalization** (logged-in user display, tailored data)
+- **Premium dashboard UI** with glassmorphism effects and smooth transitions
+
+---
+
+## 🏪 Dashboard Sections
+
+The app uses a sidebar navigation with the following sections:
+
+### 1. **Dashboard**
+
+- Attendance ring chart (overall percentage)
+- Target progress toward 75% attendance
+- Subject search and filtering
+- Goal tracker (classes needed/safe bunks)
+- Today's plan and upcoming classes
+- Risk monitor (subjects below 75%)
+- Weekly load heatmap
+
+### 2. **Attendance**
+
+- Current day attendance marking via checkboxes
+- Per-slot subject display
+- Friday-specific practical slot handling
+- Save attendance to backend
+- Live refresh of attendance summary
+
+### 3. **Timetable**
+
+- Editable slots (dropdown subject selection)
+- Auto-save on slot change
+- Weekly schedule from database
+- Compact/comfort view toggle
+- Subject count display
+
+### 4. **Analytics** (NEW)
+
+- **Trend Forecast Chart**: Visualizes two scenarios (attend next vs. miss next) with 75% target reference
+- **Subject Risk Forecasts**: Table showing current %, forecast if you attend/miss next, classes needed, and risk level
+- **What to Attend Next**: Prioritized recommendation cards based on urgency score and today's schedule
+
+### 5. **AI Upload**
+
+- Timetable image upload (PNG/JPG/JPEG/WEBP)
+- Batch selection (S1, S2, S3)
+- Subject confirmation interface
+- Integration with Groq Vision API for extraction
+
+### 6. **Settings**
+
+- Display mode (compact/comfort tables)
+- Attendance target info
+- Quick access to timetable upload
 
 ---
 
 ## ✨ Features
 
-- ✅ **AI-Powered Timetable Extraction**
-  - Upload college timetable images
-  - Automatic subject and schedule extraction using Groq Vision API
-  - Support for multiple batches (S1-S6, A1-A2, B1-B2)
+### Authentication & Session Management
 
-- 📅 **Intelligent Timetable Management**
-  - Weekly schedule display
-  - Subject type classification (Theory/Practical)
-  - Real-time timetable synchronization
+- ✅ Signup with name, email, password, year
+- ✅ Login with email and password
+- ✅ Password hashing via Werkzeug
+- ✅ Session persistence (restored on refresh)
+- ✅ Logout clears user session
 
-- ✔️ **Easy Attendance Marking**
-  - One-click attendance marking per class
-  - Daily attendance tracking
-  - Persistent storage with database backup
+### Timetable Management
 
-- 📊 **Real-Time Analytics**
-  - Per-subject attendance statistics
-  - Attendance percentage calculations
-  - Visual dashboard with attendance insights
+- ✅ AI-powered image extraction (Groq Vision)
+- ✅ Subject name confirmation interface
+- ✅ Batch-aware schedule extraction (S1, S2, S3)
+- ✅ Editable timetable slots
+- ✅ Auto-save on slot updates
+- ✅ Friday-specific practical handling
 
-- 🔐 **Secure Data Management**
-  - User authentication (signup/login)
-  - MySQL database for persistent storage
-  - CORS-protected API endpoints
+### Attendance Tracking
 
-- 🎨 **Responsive Design**
-  - Modern, user-friendly interface
-  - Mobile-optimized dashboard
-  - Intuitive navigation
+- ✅ Daily attendance marking per slot
+- ✅ Persistent attendance records in MySQL
+- ✅ Per-subject attendance summary
+- ✅ Real-time statistics refresh
+- ✅ Attendance target calculations
+
+### Analytics (NEW)
+
+- ✅ Attendance trend forecasting
+- ✅ Subject risk analysis with if-then scenarios
+- ✅ Priority recommendations
+- ✅ Visual trend chart with multiple trajectories
+- ✅ Subject-specific risk scoring
+
+### UI/UX
+
+- ✅ Premium glassmorphism design
+- ✅ Dark theme with cyan/teal accents
+- ✅ Responsive grid layouts
+- ✅ Smooth transitions and hover effects
+- ✅ Live clock and greeting
+- ✅ Notification badges
+- ✅ User avatar display
 
 ---
 
 ## 🏗️ Tech Stack
 
-### **Frontend**
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| React | 19.x | UI framework with Hooks |
-| CSS3 | Modern | Responsive styling |
-| JavaScript (ES6+) | - | Client-side logic |
-| Bootstrap | 5.3.x | UI components |
+### Frontend
 
-### **Backend**
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| Python | 3.x | Server-side language |
-| Flask | Latest | Web framework & REST API |
-| MySQL | 8.x+ | Data persistence |
-| CORS | - | Cross-origin requests |
+| Technology        | Purpose                        |
+| ----------------- | ------------------------------ |
+| React 19          | UI framework with Hooks        |
+| CSS3              | Custom styling (no frameworks) |
+| JavaScript (ES6+) | Client-side logic              |
 
-### **AI & Vision**
-| Service | Model | Purpose |
-|---------|-------|---------|
-| Groq API | Llama 4-Scout (17b) | Image-to-text OCR |
-| - | - | Timetable extraction |
+### Backend
+
+| Technology    | Purpose               |
+| ------------- | --------------------- |
+| Python 3      | Server-side language  |
+| Flask         | REST API framework    |
+| PyMySQL       | MySQL connection      |
+| Werkzeug      | Password hashing      |
+| python-dotenv | Environment variables |
+
+### Database
+
+| Technology               | Purpose                            |
+| ------------------------ | ---------------------------------- |
+| MySQL                    | User data, schedules, attendance   |
+| users table              | Account info with hashed passwords |
+| subjects table           | Subject list per user              |
+| timetable_schedule table | Day/slot to subject mapping        |
+| attendance table         | Attendance records per slot        |
+
+### AI/Vision
+
+| Service  | Purpose                            |
+| -------- | ---------------------------------- |
+| Groq API | Image OCR and timetable extraction |
 
 ---
 
 ## 📁 Project Structure
 
-```
+```text
 PERSONALIZED-ATTENDANCE-TRACKING/
-├── 📄 README.md                    # Project documentation (this file)
-├── 📄 Frontend.md                  # Frontend integration guide
-├── 📄 LICENSE                      # ISC License
-├── 📄 package.json                 # Root package metadata
+├── 📄 README.md                      # This file
+├── 📄 Frontend.md                    # Frontend setup guide
+├── 📄 LICENSE                        # ISC License
+├── 📄 package.json                   # Root metadata
 │
 ├── 📁 backend/
-│   ├── 📄 app.py                   # Flask API server & routes
-│   ├── 📄 timetable_ai.py          # AI image processing (Groq API)
-│   ├── 📄 attendance.py            # Attendance logic & calculations
-│   ├── 📄 db.py                    # Database connection handler
-│   └── 📄 attendance_db.sql        # Database schema & initialization
+│   ├── 📄 app.py                     # Flask API server & routes
+│   ├── 📄 db.py                      # Database connection
+│   ├── 📄 attendance.py              # Attendance logic
+│   ├── 📄 timetable_ai.py            # Groq extraktion
+│   └── 📄 attendance_db.sql          # Database schema
 │
 └── 📁 forntend/
-    ├── 📄 package.json             # React dependencies
-    ├── 📄 README.md                # Frontend setup guide
+    ├── 📄 package.json               # React dependencies
+    ├── 📄 README.md                  # Frontend guide
     ├── 📁 public/
-    │   ├── 📄 index.html           # Main HTML file
-    │   ├── 📄 manifest.json        # PWA manifest
-    │   └── 📄 robots.txt           # SEO metadata
+    │   ├── 📄 index.html
+    │   ├── 📄 manifest.json
+    │   └── 📄 robots.txt
     │
     └── 📁 src/
-        ├── 📄 index.js             # React entry point
-        ├── 📄 App.js               # Main App component
-        ├── 📄 App.css              # Global styling
-        ├── 📄 index.css            # Base styles
+        ├── 📄 App.js                 # Main app (routing logic)
+        ├── 📄 App.css                # Global styles
+        ├── 📄 index.js               # Entry point
         │
         ├── 📁 Components/
-        │   ├── 📄 Getstarted.js    # Onboarding/setup page
-        │   ├── 📄 SubjectMapper.js # Timetable upload & mapping
-        │   ├── 📄 Dashboard.js     # Main dashboard & attendance
-        │   ├── 📄 Timetable.js     # Timetable display component
-        │   └── 📄 *.css            # Component-specific styles
+        │   ├── 📄 Dashboard.js       # Main dashboard & sections
+        │   ├── 📄 Dashboard.css      # Dashboard styling
+        │   ├── 📄 Getstarted.js      # Auth form
+        │   ├── 📄 Timetable.js       # Timetable upload
+        │   ├── 📄 SubjectMapper.js   # Subject confirmation
+        │   └── *.css files
         │
         └── 📁 Pages/
-            ├── 📄 First.js         # Onboarding page 1
-            ├── 📄 Second.js        # Onboarding page 2
-            └── 📄 Third.js         # Onboarding page 3
-```
-│   ├── timetable_ai.py        # Groq AI integration for OCR
-│   ├── db.py                  # Database connection utilities
-│   ├── attendance.py          # Attendance logic
-│   ├── attendance_db.sql      # Database schema
-│   └── requirements.txt       # Python dependencies
-├── forntend/
-│   ├── src/
-│   │   ├── Components/
-│   │   │   ├── Dashboard.js       # Main dashboard & attendance UI
-│   │   │   ├── Dashboard.css      # Dashboard styling
-│   │   │   ├── Timetable.js       # Timetable upload & batch selection
-│   │   │   ├── Timetable.css      # Timetable styling
-│   │   │   ├── SubjectMapper.js   # Subject confirmation interface
-│   │   │   ├── Getstarted.js      # Onboarding component
-│   │   │   └── *.css              # Component-specific styles
-│   │   ├── App.js             # Main app component
-│   │   ├── index.js           # React entry point
-│   │   └── index.css          # Global styles
-│   ├── public/                # Static assets
-│   └── package.json           # Node dependencies
-├── INTEGRATION_GUIDE.md       # Detailed workflow documentation
-├── Frontend.md                # Frontend setup instructions
-├── README.md                  # This file
-└── LICENSE
-
+            ├── 📄 First.js           # Auth page
+            └── 📄 Second.js          # Timetable page
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Setup & Installation
 
 ### Prerequisites
 
-- Node.js 14+ (for Frontend)
-- Python 3.8+ (for Backend)
-- MySQL 5.7+ (for Database)
-- Groq API Key (for AI features)
+- Python 3.8+
+- Node.js 16+
+- MySQL 8.0+
+- Groq API key
 
 ### Backend Setup
 
-1. **Navigate to backend folder:**
+```bash
+cd backend
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
 
-   ```bash
-   cd backend
-   ```
+pip install flask flask-cors python-dotenv pymysql groq werkzeug
+```
 
-2. **Create Python virtual environment:**
+Create `backend/.env`:
 
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+```env
+GROQ_API_KEY=your_groq_api_key_here
+MYSQL_HOST=localhost
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
+MYSQL_DB=attendance_db
+```
 
-3. **Install dependencies:**
+Start backend:
 
-   ```bash
-   pip install flask flask-cors groq python-dotenv mysql-connector-python
-   ```
+```bash
+python app.py
+```
 
-4. **Setup database:**
-
-   ```bash
-   mysql -u root -p < attendance_db.sql
-   ```
-
-5. **Configure environment variables:**
-   Create `.env` file in backend folder:
-
-   ```
-   GROQ_API_KEY=your_groq_api_key_here
-   MYSQL_HOST=localhost
-   MYSQL_USER=root
-   MYSQL_PASSWORD=your_password
-   MYSQL_DB=attendance_db
-   ```
-
-6. **Run Flask server:**
-   ```bash
-   python app.py
-   ```
-   Server runs on `http://127.0.0.1:5000`
+Server runs at `http://127.0.0.1:5000`
 
 ### Frontend Setup
 
-1. **Navigate to frontend folder:**
-
-   ```bash
-   cd forntend
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-3. **Configure backend URL** (optional):
-   Create `.env` file in forntend folder:
-
-   ```
-   REACT_APP_BACKEND_URL=http://localhost:5000
-   ```
-
-4. **Start development server:**
-   ```bash
-   npm start
-   ```
-   App opens on `http://localhost:3000`
-
----
-
-## 📊 Complete Workflow
-
-### 1. **Signup & Login**
-
-- User creates account with email and password
-- Authentication endpoints: `/signup`, `/login`
-
-### 2. **Upload Timetable Image**
-
-- User navigates to Timetable upload section
-- Selects their batch (S1, S2, S3, S4, S5, S6, A1, A2, B1, B2)
-- Uploads timetable image (PNG/JPG format)
-- Frontend sends to **`/api/timetable/extract`** endpoint
-
-### 3. **AI Extracts Subjects**
-
-- **timetable_ai.py** receives image + batch info
-- Groq Vision API analyzes image:
-  - Extracts subject abbreviations (ADASL, PROGG, DCCN, etc.)
-  - Identifies full subject names
-  - Classifies as Theory or Practical
-  - Builds 5-day weekly schedule
-- Returns JSON with `abbreviations`, `schedule`, and `raw_text`
-
-**AI Response Format:**
-
-```json
-{
-  "abbreviations": [
-    {"short": "ADASL", "full": "Advanced Data Structures", "type": "Theory"},
-    {"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}
-  ],
-  "schedule": {
-    "Monday": ["ADASL", "PROGG", "CNL"],
-    "Tuesday": ["ADASL", "DCCN", "PROGG"],
-    ...
-  },
-  "raw_text": "Extracted text from image"
-}
+```bash
+cd forntend
+npm install
+npm start
 ```
 
-### 4. **User Confirms/Edits Subjects**
+App runs at `http://localhost:3000`
 
-- **SubjectMapper.js** displays extracted subjects
-- User can:
-  - ✏️ Edit subject names and types
-  - ➕ Add missing subjects
-  - ❌ Delete incorrect entries
-  - 💾 Confirms final list
+Optional `forntend/.env`:
 
-### 5. **Save to Database**
-
-- SubjectMapper sends confirmed subjects to **`/api/timetable/save-subjects`**
-- Backend stores in database:
-  - **subjects table**: subject_name, type, total_classes, attended_classes
-  - **timetable_schedule table**: subject assignments for each day/slot
-
-### 6. **Display on Dashboard**
-
-- Dashboard.js fetches from **`/api/timetable/week-details/<user_id>`**
-- Displays subjects organized by:
-  - **Days**: Monday through Friday
-  - **Time Slots**: s1 (8:15-10:15), s2 (10:30-11:30), s3 (11:30-12:30), a1 (1:15-2:15), a2 (2:15-3:15)
-  - **Subject Info**: Name + Type badge (THEORY/PRACTICAL)
-
-### 7. **Mark Attendance**
-
-- User checks boxes for attended classes (current day only)
-- Clicks "Save Today's Attendance"
-- Frontend sends to **`/api/attendance/mark`** with:
-  - user_id, subject_id, slot_key, status
-- Backend updates:
-  - **attendance table**: records daily attendance
-  - **subjects table**: increments total_classes and attended_classes counters
-
-### 8. **View Attendance Summary**
-
-- Dashboard fetches from **`/api/attendance/summary/<user_id>`**
-- Displays per-subject statistics:
-  - Total classes
-  - Attended classes
-  - Attendance percentage
-  - Subject type (Theory/Practical)
-
----
-
-## 🔌 API Endpoints
-
-### Timetable Extraction & Management
-
-| Endpoint                                | Method | Purpose                | Request                           | Response                                                      |
-| --------------------------------------- | ------ | ---------------------- | --------------------------------- | ------------------------------------------------------------- |
-| `/api/timetable/extract`                | POST   | AI extraction          | FormData: image, batch            | JSON: abbreviations, schedule                                 |
-| `/api/timetable/save-subjects`          | POST   | Save to DB             | JSON: user_id, subjects, schedule | success, saved_subjects_count                                 |
-| `/api/timetable/week/<user_id>`         | GET    | Get simple timetable   | -                                 | JSON: week array with subject names                           |
-| `/api/timetable/week-details/<user_id>` | GET    | Get detailed timetable | -                                 | JSON: week array with subject objects (name, type, time_slot) |
-
-### Attendance Management
-
-| Endpoint                            | Method | Purpose              | Request                  | Response                                          |
-| ----------------------------------- | ------ | -------------------- | ------------------------ | ------------------------------------------------- |
-| `/api/attendance/mark`              | POST   | Mark attendance      | JSON: user_id, records[] | success, message                                  |
-| `/api/attendance/today/<user_id>`   | GET    | Get today's schedule | -                        | JSON: today's subjects                            |
-| `/api/attendance/summary/<user_id>` | GET    | Attendance stats     | -                        | JSON: summary array (subject, attended, total, %) |
-
-### Authentication
-
-| Endpoint  | Method | Purpose        | Request               | Response         |
-| --------- | ------ | -------------- | --------------------- | ---------------- |
-| `/signup` | POST   | Create account | JSON: email, password | message, success |
-| `/login`  | POST   | Login user     | JSON: email, password | message, success |
-
----
-
-## 🤖 AI Features
-
-### Groq Vision Integration
-
-- **Model**: meta-llama/llama-4-scout-17b-16e-instruct
-- **Task**: College timetable OCR and subject extraction
-- **Input**: Base64-encoded image + batch identifier
-- **Output**: Structured JSON with subjects and schedule
-
-### Batch-Aware Extraction
-
-- Filters subjects by selected batch (S1, S2, etc.)
-- Parses entries formatted as: `BATCH-SUBJECT-STAFF-ROOM`
-- Example: `S1-ADASL-MPN-503` → extracts only S1 subjects
-
-### Response Parsing
-
-- **Primary**: Parses JSON responses
-- **Fallback 1**: Strips markdown code blocks and parses JSON
-- **Fallback 2**: Extracts JSON object from response body
-- **Fallback 3**: Parses markdown format with regex pattern matching
-
-### Subject Type Classification
-
-- **Theory**: Regular classroom subjects (lectures, tutorials)
-- **Practical**: Lab subjects, marked with "LAB", "PDL", or "Practical" designation
-
----
-
-## 💾 Database Schema
-
-### Tables
-
-**users** - User accounts
-
-```
-id, email, password, created_at, updated_at
-```
-
-**subjects** - Subject list per user
-
-```
-id, user_id, subject_name, type (Theory/Practical/Both),
-total_classes, attended_classes, created_at, updated_at
-```
-
-**timetable_schedule** - Weekly subject schedule
-
-```
-id, user_id, subject_id, day (Monday-Friday),
-slot_key (s1-s3, a1-a2), time_slot, created_at, updated_at
-```
-
-**attendance** - Daily attendance records
-
-```
-id, user_id, subject_id, date, time_slot, slot_key,
-status (Present/Absent), created_at, updated_at
+```env
+REACT_APP_BACKEND_URL=http://localhost:5000
 ```
 
 ---
 
-## 🎨 Frontend Components
+## 📡 API Documentation
 
-### Dashboard.js
+### Authentication Endpoints
 
-- Main interface displaying timetable and attendance
-- Sections: Dashboard, Attendance, Timetable
-- Features: Weekly view, daily attendance marking, statistics
-- Auto-refreshes attendance summary
+- `POST /signup`
+  - Body: `{ name, email, password, year }`
+  - Returns: `{ success, message, user }`
 
-### Timetable.js
+- `POST /login`
+  - Body: `{ email, password }`
+  - Returns: `{ success, message, user }`
 
-- Upload timetable image
-- **Batch selection dialog** (S1-S6, A1-A2, B1-B2)
-- Shows extracted subjects
-- Integration with SubjectMapper
+### Timetable Endpoints
 
-### SubjectMapper.js
+- `POST /api/timetable/extract`
+  - File form-data: `image`, `batch`
+  - Returns: `{ success, data: { abbreviations, schedule, raw_text } }`
 
-- Edit/confirm extracted subjects
-- Add/remove subjects manually
-- Set subject types
-- Review before saving
+- `POST /api/timetable/save-subjects`
+  - Body: `{ user_id, subjects, schedule }`
+  - Returns: `{ success, message }`
 
-### Dashboard.css & Timetable.css
+- `GET /api/subjects/<user_id>`
+  - Returns: `{ success, subjects }`
 
-- Responsive grid layouts
-- Modal dialogs for batch selection
-- Subject type badges
-- Attendance checkboxes styling
+- `GET /api/timetable/week/<user_id>`
+  - Returns: `{ success, week }`
 
----
+- `GET /api/timetable/week-details/<user_id>`
+  - Returns: `{ success, week (with subject_id, type, etc.) }`
 
-## 🔧 Configuration
+- `PUT /api/timetable/update-slot`
+  - Body: `{ user_id, day, slot_key, subject_id }`
+  - Returns: `{ success, message }`
 
-### Environment Variables (.env)
+### Attendance Endpoints
 
-**Backend (.env)**
+- `GET /api/attendance/today/<user_id>`
+  - Returns: `{ success, data }`
 
-```
-GROQ_API_KEY=sk-...                    # Groq API key (get from groq.com)
-MYSQL_HOST=localhost                   # Database host
-MYSQL_USER=root                        # Database user
-MYSQL_PASSWORD=password                # Database password
-MYSQL_DB=attendance_db                 # Database name
-FLASK_ENV=development                  # Flask environment
-```
+- `POST /api/attendance/mark`
+  - Body: `{ user_id, records }`
+  - Returns: `{ success, message }`
 
-**Frontend (.env)**
-
-```
-REACT_APP_BACKEND_URL=http://localhost:5000    # Backend API URL
-```
+- `GET /api/attendance/summary/<user_id>`
+  - Returns: `{ success, summary (per subject) }`
 
 ---
 
-## 🐛 Troubleshooting
+## 👥 User Flow
 
-### "No subjects detected" Error
+### First-Time User
 
-- Ensure timetable image quality is good
-- Verify Groq API key is set in `.env`
-- Check if batch is selected correctly
-- Try uploading a clearer image
+1. **Land on Auth Page**
+   - User signs up with name, email, password, year
+   - Backend creates user record in MySQL with hashed password
 
-### Database Connection Failed
+2. **Upload Timetable**
+   - User is redirected to Timetable page
+   - Uploads timetable image, selects batch (S1/S2/S3)
+   - AI extracts subjects and schedule
+   - User confirms/edits subject names
+   - Subjects and schedule saved to database
 
-- Verify MySQL is running
-- Check database credentials in `.env`
-- Run `mysql -u root -p < attendance_db.sql` to setup DB
-- Ensure `attendance_db` exists: `mysql -u root -p -e "SHOW DATABASES;"`
+3. **Access Dashboard**
+   - Navigates to Dashboard (all sections now visible)
+   - Can mark attendance, edit timetable, view analytics
 
-### Batch Selection Not Working
+### Returning User
 
-- Ensure batch value is sent in FormData
-- Check browser console for network errors
-- Verify backend receives batch parameter: POST `/api/timetable/extract`
+1. **Login**
+   - User logs in with email and password
+   - Session restored in app state
+   - Dashboard shows immediately
 
-### Timetable Not Displaying
-
-- Check if subjects were saved to database
-- Verify user_id is correct (currently hardcoded to 1)
-- Check database: `SELECT * FROM subjects WHERE user_id = 1;`
-
----
-
-## 📝 Usage Example
-
-1. **Start Both Servers:**
-
-   ```bash
-   # Terminal 1 - Backend
-   cd backend && python app.py
-
-   # Terminal 2 - Frontend
-   cd forntend && npm start
-   ```
-
-2. **Open Browser:**
-   Navigate to `http://localhost:3000`
-
-3. **Upload Timetable:**
-   - Click "Timetable Upload"
-   - Select batch: S2
-   - Upload timetable image
-   - Wait for AI extraction (5-10 seconds)
-   - Confirm subjects in mapper
-
-4. **Mark Attendance:**
-   - Go to Dashboard
-   - Check boxes for attended classes
-   - Click "Save Today's Attendance"
-   - View statistics in Attendance tab
+2. **Dashboard**
+   - All timetable, attendance, and analytics data loads from backend
+   - Analytics calculated from real attendance + timetable data
 
 ---
 
-## 🚀 Future Enhancements
+## 🔑 Key Features Explained
 
-- [ ] Real user authentication (currently mocked)
-- [ ] Multiple user support with actual user IDs
-- [ ] Alert system for low attendance
-- [ ] Export attendance reports (PDF/CSV)
-- [ ] Mobile app version
-- [ ] Real-time notifications
-- [ ] Attendance analytics dashboard
-- [ ] Support for multiple semesters
-- [ ] Class notes/materials integration
-- [ ] Teacher dashboard
+### Session Persistence
+
+- User object stored in `localStorage` as `pat-current-user`
+- On app load, session is restored if valid
+- User can refresh browser without losing login
+- Logout clears stored user
+
+### Analytics Calculations
+
+- **Trend**: Projects attendance % if user attends/misses next 6 classes
+- **Risk Forecast**: Shows per-subject impact of next attendance decision
+- **Recommendations**: Prioritizes subjects by urgency (classes needed + deficit + today's schedule)
+
+### Friday Special Handling
+
+- Friday s1 slot is always "Practical" (8:15-10:15)
+- Friday s2 combines with s3 as one practical slot (10:30-12:30)
+- Backend stores as two entries; frontend renders merged cells
+
+---
+
+## 📝 Notes
+
+- Frontend folder name is intentionally `forntend`.
+- All user-specific data uses authenticated `user_id` (no hardcoded IDs).
+- Analytics sections are fully functional with real backend data.
+- If MySQL is down, API calls fail gracefully with error messages shown in UI.
 
 ---
 
 ## 📄 License
 
-See [LICENSE](LICENSE) file for details.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please fork this repository and create a pull request with your improvements.
-
----
-
-## 📧 Support
-
-For issues or suggestions, please create an issue in this repository.
-
----
-
-**Last Updated:** April 2026
-**Version:** 1.0.0
+ISC
