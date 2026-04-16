@@ -3,6 +3,7 @@ import "./Dashboard.css";
 
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+const COMPACT_TABLES_STORAGE_KEY = "pat-compact-tables";
 
 const ATTENDANCE_SLOT_TIMES = {
   s1: "8:15 – 10:15",
@@ -46,7 +47,13 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedHeatmapDay, setSelectedHeatmapDay] = useState("");
   const [subjectSearch, setSubjectSearch] = useState("");
-  const [compactTables, setCompactTables] = useState(false);
+  const [compactTables, setCompactTables] = useState(() => {
+    try {
+      return localStorage.getItem(COMPACT_TABLES_STORAGE_KEY) === "true";
+    } catch (_err) {
+      return false;
+    }
+  });
   const [liveClock, setLiveClock] = useState(new Date());
   const [notificationCount] = useState(3);
   const [isUploadLoading, setIsUploadLoading] = useState(false);
@@ -92,6 +99,17 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
 
   const [timetableWeek, setTimetableWeek] = useState([]);
   const [timetableDetailed, setTimetableDetailed] = useState([]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        COMPACT_TABLES_STORAGE_KEY,
+        compactTables ? "true" : "false",
+      );
+    } catch (_err) {
+      // Ignore storage errors (private mode or restricted storage).
+    }
+  }, [compactTables]);
 
   useEffect(() => {
     if (!userId) {
@@ -623,6 +641,11 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
     setSlotAttendanceChecked((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const navigateToSection = (section) => {
+    setActiveSection(section);
+    setSidebarOpen(false);
+  };
+
   const handleSubjectSelect = (subject) => setSelectedSubject(subject);
 
   const runSimulatedUpload = useCallback(() => {
@@ -859,7 +882,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
             <button
               type="button"
               className={`menu-item ${activeSection === "dashboard" ? "active" : ""}`}
-              onClick={() => setActiveSection("dashboard")}
+              onClick={() => navigateToSection("dashboard")}
+              aria-label="Open dashboard section"
+              aria-current={activeSection === "dashboard" ? "page" : undefined}
             >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -886,7 +911,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
             <button
               type="button"
               className={`menu-item ${activeSection === "attendance" ? "active" : ""}`}
-              onClick={() => setActiveSection("attendance")}
+              onClick={() => navigateToSection("attendance")}
+              aria-label="Open attendance section"
+              aria-current={activeSection === "attendance" ? "page" : undefined}
             >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -913,7 +940,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
             <button
               type="button"
               className={`menu-item ${activeSection === "timetable" ? "active" : ""}`}
-              onClick={() => setActiveSection("timetable")}
+              onClick={() => navigateToSection("timetable")}
+              aria-label="Open timetable section"
+              aria-current={activeSection === "timetable" ? "page" : undefined}
             >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -948,7 +977,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
             <button
               type="button"
               className={`menu-item ${activeSection === "analytics" ? "active" : ""}`}
-              onClick={() => setActiveSection("analytics")}
+              onClick={() => navigateToSection("analytics")}
+              aria-label="Open analytics section"
+              aria-current={activeSection === "analytics" ? "page" : undefined}
             >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -1010,7 +1041,9 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
             <button
               type="button"
               className={`menu-item ${activeSection === "settings" ? "active" : ""}`}
-              onClick={() => setActiveSection("settings")}
+              onClick={() => navigateToSection("settings")}
+              aria-label="Open settings section"
+              aria-current={activeSection === "settings" ? "page" : undefined}
             >
               <span className="menu-item-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -1093,14 +1126,14 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                   <button
                     type="button"
                     className="dash-chip-btn"
-                    onClick={() => setActiveSection("attendance")}
+                    onClick={() => navigateToSection("attendance")}
                   >
                     Mark Today
                   </button>
                   <button
                     type="button"
                     className="dash-chip-btn"
-                    onClick={() => setActiveSection("timetable")}
+                    onClick={() => navigateToSection("timetable")}
                   >
                     Edit Timetable
                   </button>
@@ -2188,6 +2221,14 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
         <span />
         <span />
       </button>
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="dash-mobile-backdrop"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }
