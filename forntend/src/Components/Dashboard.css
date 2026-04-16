@@ -901,6 +901,22 @@
   z-index: 200;
 }
 
+.dash-mobile-backdrop {
+  display: none;
+}
+
+.menu-item:focus-visible,
+.dash-chip-btn:focus-visible,
+.tt-primary:focus-visible,
+.dash-logout-btn:focus-visible,
+.bottom-menu-toggle:focus-visible,
+.subject-list-item:focus-visible,
+.tt-slot-select:focus-visible,
+.attendance-slot-checkbox:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.9);
+  outline-offset: 2px;
+}
+
 .bottom-menu-toggle span {
   display: block;
   width: 16px;
@@ -956,6 +972,16 @@
     top: 0;
     bottom: 0;
     z-index: 300;
+  }
+
+  .dash-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    border: none;
+    background: rgba(2, 6, 23, 0.58);
+    z-index: 250;
+    cursor: pointer;
   }
 }
 
@@ -2270,5 +2296,22 @@
   .analytics-action-tags {
     flex-direction: row;
     align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-main-screen,
+  .dash-content-card,
+  .dash-chip-btn,
+  .menu-item,
+  .analytics-action-item,
+  .subject-list-item,
+  .dash-box-btn,
+  .tt-primary,
+  .attendance-ring,
+  .ai-upload-spinner {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }
