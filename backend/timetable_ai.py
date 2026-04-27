@@ -4,12 +4,24 @@ import os
 import json
 import re
 import base64
+import time
 from groq import Groq
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 MOCK_MODE = False
+
+
+def _api_error_payload(message: str) -> dict:
+    return {
+        "abbreviations": [],
+        "schedule": {},
+        "raw_text": "",
+        "error": message,
+    }
+
 
 try:
     api_key = os.getenv("GROQ_API_KEY")
@@ -196,37 +208,56 @@ OUTPUT RULES — VERY IMPORTANT:
 Replace ALL example values with actual data from the image."""
 
     # ── Call Groq API ─────────────────────────────────────────────────────────
-    try:
-        image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+    image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+    raw = ""
+    last_error = None
 
-        response = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{image_b64}"},
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-            max_tokens=2048,
-            temperature=0.0,
-        )
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_b64}"
+                                },
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+                max_tokens=2048,
+                temperature=0.0,
+            )
 
-        raw = response.choices[0].message.content.strip()
+            raw = response.choices[0].message.content.strip()
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            err = str(e)
+            is_transient = (
+                "connection error" in err.lower()
+                or "timed out" in err.lower()
+                or "temporarily" in err.lower()
+            )
 
-    except Exception as e:
-        print(f"Error calling Groq API: {e}")
-        return {
-            "abbreviations": [],
-            "schedule": {},
-            "raw_text": "",
-            "error": f"API Error: {str(e)}",
-        }
+            if is_transient and attempt < 2:
+                print(
+                    f"Groq transient error on attempt {attempt + 1}: {e}. Retrying..."
+                )
+                time.sleep(attempt + 1)
+                continue
+
+            break
+
+    if last_error is not None:
+        print(f"Error calling Groq API: {last_error}")
+        return _api_error_payload(f"API Error: {str(last_error)}")
 
     # ── Parse the response ────────────────────────────────────────────────────
     parsed = None
@@ -296,12 +327,11 @@ Replace ALL example values with actual data from the image."""
     # All attempts failed
     if not parsed:
         print(f"⚠️  Failed to parse AI response: {raw[:300]}")
-        return {
-            "abbreviations": [],
-            "schedule": {},
-            "raw_text": raw,
-            "error": "Could not parse AI response. Try a clearer image.",
-        }
+        payload = _api_error_payload(
+            "Could not parse AI response. Try a clearer image."
+        )
+        payload["raw_text"] = raw
+        return payload
 
     # Clean up junk abbreviations
     parsed["abbreviations"] = clean_abbreviations(parsed.get("abbreviations", []))

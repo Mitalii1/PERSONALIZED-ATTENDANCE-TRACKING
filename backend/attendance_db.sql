@@ -1,3 +1,9 @@
--- Clear old data
-DELETE FROM timetable_schedule WHERE user_id = 1;
-DELETE FROM subjects WHERE user_id = 1;
+SET FOREIGN_KEY_CHECKS = 0;
+
+TRUNCATE TABLE attendance;
+TRUNCATE TABLE timetable_schedule;
+TRUNCATE TABLE subjects;
+TRUNCATE TABLE students;
+TRUNCATE TABLE users;
+
+SET FOREIGN_KEY_CHECKS = 1;
