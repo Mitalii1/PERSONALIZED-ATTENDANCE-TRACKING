@@ -4,6 +4,8 @@ import "./Dashboard.css";
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 const COMPACT_TABLES_STORAGE_KEY = "pat-compact-tables";
+const ATTENDANCE_TARGET = 75;
+const ATTENDANCE_ALERT_THRESHOLD = 80;
 
 const ATTENDANCE_SLOT_TIMES = {
   s1: "8:15 – 10:15",
@@ -55,7 +57,8 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
     }
   });
   const [liveClock, setLiveClock] = useState(new Date());
-  const [notificationCount] = useState(3);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [dismissedAlertSignature, setDismissedAlertSignature] = useState("");
   const [isUploadLoading, setIsUploadLoading] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [detectedSubjects, setDetectedSubjects] = useState([]);
@@ -384,8 +387,6 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
     };
   }, []);
 
-  const ATTENDANCE_TARGET = 75;
-
   const classesNeededForTarget = useMemo(() => {
     if (totalLectures === 0) return 0;
     const needed = 3 * totalLectures - 4 * attendedLectures;
@@ -428,6 +429,50 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
       .sort((a, b) => a.percent - b.percent)
       .slice(0, 4);
   }, [subjects, weeklySubjectData]);
+
+  const lowAttendanceAlerts = useMemo(() => {
+    return subjects
+      .map((sub) => {
+        const stats = weeklySubjectData[sub] || {};
+        const percent = stats.attendedPercent || 0;
+        return {
+          name: sub,
+          total: stats.totalLectures || 0,
+          attended: stats.attendedLectures || 0,
+          percent,
+          level: percent < ATTENDANCE_TARGET ? "critical" : "warning",
+        };
+      })
+      .filter(
+        (sub) => sub.total > 0 && sub.percent < ATTENDANCE_ALERT_THRESHOLD,
+      )
+      .sort((a, b) => {
+        const severityOrder = { critical: 0, warning: 1 };
+        const severityDiff = severityOrder[a.level] - severityOrder[b.level];
+        if (severityDiff !== 0) return severityDiff;
+        return a.percent - b.percent;
+      });
+  }, [subjects, weeklySubjectData]);
+
+  const notificationCount = lowAttendanceAlerts.length;
+  const lowAttendanceSignature = useMemo(
+    () =>
+      lowAttendanceAlerts
+        .map((item) => `${item.name}:${item.percent}`)
+        .join("|"),
+    [lowAttendanceAlerts],
+  );
+
+  useEffect(() => {
+    if (notificationCount === 0) {
+      setDismissedAlertSignature("");
+      return;
+    }
+
+    if (dismissedAlertSignature !== lowAttendanceSignature) {
+      setNotificationsOpen(true);
+    }
+  }, [notificationCount, lowAttendanceSignature, dismissedAlertSignature]);
 
   const todayRow = timetableWeek.find((r) => r.day === dayLabel) || null;
 
@@ -1085,6 +1130,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
                 type="button"
                 className="dash-notify-btn"
                 aria-label="Notifications"
+                onClick={() => setNotificationsOpen((prev) => !prev)}
               >
                 <span>🔔</span>
                 {notificationCount > 0 && (
@@ -1106,6 +1152,75 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
               </button>
             </div>
           </header>
+
+          {notificationsOpen && (
+            <section className="dash-alert-card" role="alert">
+              <div className="dash-alert-head">
+                <h3 className="dash-alert-title">
+                  {notificationCount > 0
+                    ? `Attendance Alert: ${notificationCount} subject${notificationCount > 1 ? "s" : ""} below ${ATTENDANCE_ALERT_THRESHOLD}%`
+                    : "No attendance alerts right now"}
+                </h3>
+                <button
+                  type="button"
+                  className="dash-alert-close"
+                  aria-label="Dismiss attendance alert"
+                  onClick={() => {
+                    setNotificationsOpen(false);
+                    setDismissedAlertSignature(lowAttendanceSignature);
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+              {notificationCount > 0 ? (
+                <>
+                  <div className="dash-alert-list" role="list">
+                    {lowAttendanceAlerts.slice(0, 5).map((item) => (
+                      <button
+                        key={item.name}
+                        type="button"
+                        className="dash-alert-item"
+                        onClick={() => {
+                          setSelectedSubject(item.name);
+                          setActiveSection("dashboard");
+                          setNotificationsOpen(false);
+                        }}
+                        role="listitem"
+                      >
+                        <span className="dash-alert-item-name">
+                          {item.name}
+                        </span>
+                        <span
+                          className={`dash-alert-item-badge dash-alert-item-badge--${item.level}`}
+                        >
+                          {item.percent}%{" "}
+                          {item.level === "critical"
+                            ? "(critical)"
+                            : "(warning)"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="dash-alert-action"
+                    onClick={() => {
+                      setActiveSection("analytics");
+                      setNotificationsOpen(false);
+                    }}
+                  >
+                    Open Analytics Risk Forecast
+                  </button>
+                </>
+              ) : (
+                <p className="dash-empty-note" style={{ marginTop: "10px" }}>
+                  All subjects are at or above {ATTENDANCE_ALERT_THRESHOLD}%.
+                  Keep the streak going.
+                </p>
+              )}
+            </section>
+          )}
 
           {/* ── DASHBOARD SECTION ── */}
           {activeSection === "dashboard" && (

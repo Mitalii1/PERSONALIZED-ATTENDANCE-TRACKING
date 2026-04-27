@@ -14,7 +14,8 @@ from attendance import (
     get_attendance_summary,
 )
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 app = Flask(__name__)
 CORS(app)
@@ -200,6 +201,24 @@ def extract_timetable():
     try:
         image_bytes = file.read()
         result = extract_subjects_from_image(image_bytes, batch)
+
+        # If AI extraction fails, return a gateway-style failure instead of success.
+        if isinstance(result, dict) and result.get("error"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": result.get("error"),
+                        "data": {
+                            "abbreviations": result.get("abbreviations", []),
+                            "schedule": result.get("schedule", {}),
+                            "raw_text": result.get("raw_text", ""),
+                        },
+                    }
+                ),
+                502,
+            )
+
         return jsonify({"success": True, "data": result}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
