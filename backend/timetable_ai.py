@@ -11,7 +11,13 @@ from dotenv import load_dotenv
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-MOCK_MODE = False
+MOCK_MODE = os.getenv("MOCK_MODE", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 
 
 def _api_error_payload(message: str) -> dict:
@@ -27,7 +33,8 @@ try:
     api_key = os.getenv("GROQ_API_KEY")
     if api_key:
         client = Groq(api_key=api_key)
-        MOCK_MODE = False
+        if MOCK_MODE:
+            print("MOCK_MODE enabled. Skipping Groq timetable extraction.")
     else:
         print("⚠️  GROQ_API_KEY not found. Using MOCK_MODE.")
         client = None
@@ -215,7 +222,7 @@ Replace ALL example values with actual data from the image."""
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                model=GROQ_MODEL,
                 messages=[
                     {
                         "role": "user",
@@ -240,6 +247,12 @@ Replace ALL example values with actual data from the image."""
         except Exception as e:
             last_error = e
             err = str(e)
+            if "model_not_found" in err.lower() or "does not exist" in err.lower():
+                last_error = RuntimeError(
+                    f"Groq model '{GROQ_MODEL}' is unavailable for this API key. "
+                    "Set GROQ_MODEL in backend/.env to an authorized vision model."
+                )
+                break
             is_transient = (
                 "connection error" in err.lower()
                 or "timed out" in err.lower()
