@@ -197,4 +197,4 @@ Returning user:
 
 ## License
 
-ISC. See LICENSE for details.
+MIT. See LICENSE for details.
