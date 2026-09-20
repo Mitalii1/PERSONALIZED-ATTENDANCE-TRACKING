@@ -2,7 +2,6 @@ import React from "react";
 import Timetable from "../Components/Timetable";
 
 function Second({
-  userId,
   onBack,
   onSaved,
   onGoDashboard,
@@ -10,7 +9,7 @@ function Second({
 }) {
   return (
     <>
-      <Timetable userId={userId} onSaved={onSaved} />
+      <Timetable onSaved={onSaved} />
 
       {typeof onBack === "function" && (
         <button

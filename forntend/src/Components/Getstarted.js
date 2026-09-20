@@ -185,7 +185,12 @@ function Getstarted({ onLogin, onRegistered }) {
         });
         if (typeof onRegistered === "function") {
           onRegistered({
-            ...(data.user || { email: values.email.trim() }),
+            token: data.token,
+            name: data.name,
+            user: {
+              ...(data.user || { email: values.email.trim() }),
+              name: data.name || data.user?.name,
+            },
             remember: true,
           });
         }
@@ -216,7 +221,12 @@ function Getstarted({ onLogin, onRegistered }) {
         setValues((prev) => ({ ...prev, password: "" }));
         if (typeof onLogin === "function") {
           onLogin({
-            ...(data.user || { email: values.email.trim() }),
+            token: data.token,
+            name: data.name,
+            user: {
+              ...(data.user || { email: values.email.trim() }),
+              name: data.name || data.user?.name,
+            },
             remember: values.remember,
           });
         }

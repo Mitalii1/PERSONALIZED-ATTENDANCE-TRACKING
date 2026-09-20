@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import SubjectMapper from "./SubjectMapper";
+import { authenticatedFetch, getAuthToken } from "../api";
 import "./Timetable.css";
 
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
-function Timetable({ onSaved, userId }) {
+function Timetable({ onSaved }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
   const [status, setStatus] = useState("");
@@ -20,11 +21,31 @@ function Timetable({ onSaved, userId }) {
   const [batch, setBatch] = useState("");
   const [allBatches] = useState(["S1", "S2", "S3"]);
 
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
   function onFileChange(e) {
     const selected = e.target.files?.[0];
     if (!selected) {
       setFile(null);
       setPreview("");
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(selected.type)) {
+      setFile(null);
+      setPreview("");
+      setStatus("Please choose a PNG, JPG, or WEBP image.");
+      setStatusType("error");
+      return;
+    }
+    if (selected.size > 10 * 1024 * 1024) {
+      setFile(null);
+      setPreview("");
+      setStatus("Please choose an image smaller than 10MB.");
+      setStatusType("error");
       return;
     }
     setFile(selected);
@@ -57,7 +78,7 @@ function Timetable({ onSaved, userId }) {
     formData.append("batch", batch); // NEW: append batch info
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/timetable/extract`, {
+      const response = await authenticatedFetch(`${BACKEND_URL}/api/timetable/extract`, {
         method: "POST",
         body: formData,
       });
@@ -95,7 +116,7 @@ function Timetable({ onSaved, userId }) {
   }
 
   async function saveSubjectsToDB(subjects) {
-    if (!userId) {
+    if (!getAuthToken()) {
       setStatus("Your session is missing. Please login again.");
       setStatusType("error");
       return;
@@ -106,15 +127,14 @@ function Timetable({ onSaved, userId }) {
     setStatusType("success");
 
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${BACKEND_URL}/api/timetable/save-subjects`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: userId,
             subjects: subjects,
-            schedule: schedule, // ← this is already in state from the AI response
+            schedule: schedule,
           }),
         },
       );
@@ -179,7 +199,7 @@ function Timetable({ onSaved, userId }) {
               <input
                 id="tt-file"
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/webp"
                 onChange={onFileChange}
                 className="tt-file-input"
               />

@@ -1,0 +1,60 @@
+# docker-compose.yml — the whole stack with one command.
+#
+#   docker compose up --build
+#
+# Why bother: "install MySQL, create the database, create four tables, make a
+# venv, set six env vars" is a README that stops people from ever running your
+# project. `docker compose up` is a README anyone can follow.
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devpassword}
+      MYSQL_DATABASE: attendance_db
+    ports:
+      - "3307:3306"   # 3307 on the host so it never clashes with a local MySQL
+    volumes:
+      - db_data:/var/lib/mysql
+      # Anything in this folder runs on first boot, in filename order.
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-devpassword}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devpassword}
+      MYSQL_DB: attendance_db
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in a .env file next to this compose file}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MOCK_MODE: ${MOCK_MODE:-true}
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app        # live reload while developing
+
+  frontend:
+    build: ./forntend
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:5000
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./forntend/src:/app/src
+      - ./forntend/public:/app/public
+
+volumes:
+  db_data:

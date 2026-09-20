@@ -1,9 +1,13 @@
 import os
 import re
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
+from auth import require_auth, issue_token, hash_password, verify_password
 from timetable_ai import extract_subjects_from_image
 from db import get_connection
 from attendance import (
@@ -13,9 +17,6 @@ from attendance import (
     mark_attendance,
     get_attendance_summary,
 )
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 app = Flask(__name__)
 CORS(app)
@@ -93,7 +94,7 @@ def signup():
                 409,
             )
 
-        hashed_password = generate_password_hash(password)
+        hashed_password = hash_password(password)
         cursor.execute(
             """
             INSERT INTO users (name, email, password, year)
@@ -111,6 +112,8 @@ def signup():
                 {
                     "success": True,
                     "message": "Account created successfully!",
+                    "token": issue_token(user_id, email),
+                    "name": name,
                     "user": {
                         "id": user_id,
                         "name": name,
@@ -150,7 +153,7 @@ def login():
         cursor.close()
         conn.close()
 
-        if not user or not check_password_hash(user["password"], password):
+        if not user or not verify_password(user["password"], password):
             return (
                 jsonify({"success": False, "message": "Invalid email or password"}),
                 401,
@@ -161,6 +164,8 @@ def login():
                 {
                     "success": True,
                     "message": "Login successful",
+                    "token": issue_token(user["id"], user["email"]),
+                    "name": user["name"],
                     "user": {
                         "id": user["id"],
                         "name": user["name"],
@@ -297,14 +302,12 @@ def parse_abbreviation(entry: str) -> str:
 
 # ── Save subjects + schedule to database ─────────────────────────────────────
 @app.route("/api/timetable/save-subjects", methods=["POST"])
+@require_auth
 def save_subjects():
-    data = request.get_json()
-    user_id = data.get("user_id")
+    data = request.get_json() or {}
+    user_id = g.user_id
     subjects = data.get("subjects", [])
     schedule = data.get("schedule", {})
-
-    if not user_id:
-        return jsonify({"success": False, "error": "user_id is required"}), 400
 
     try:
         conn = get_connection()
@@ -414,8 +417,9 @@ def save_subjects():
 
 
 # ── Get subjects for a user ───────────────────────────────────────────────────
-@app.route("/api/subjects/<int:user_id>", methods=["GET"])
-def get_subjects(user_id):
+@app.route("/api/subjects", methods=["GET"])
+@require_auth
+def get_subjects():
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -427,7 +431,7 @@ def get_subjects(user_id):
             WHERE user_id = %s
             ORDER BY subject_name
         """,
-            (user_id,),
+            (g.user_id,),
         )
 
         subjects = cursor.fetchall()
@@ -441,30 +445,33 @@ def get_subjects(user_id):
 
 
 # ── Get full week timetable (simple) ─────────────────────────────────────────
-@app.route("/api/timetable/week/<int:user_id>", methods=["GET"])
-def timetable_week(user_id):
+@app.route("/api/timetable/week", methods=["GET"])
+@require_auth
+def timetable_week():
     try:
-        week = get_timetable_week(user_id)
+        week = get_timetable_week(g.user_id)
         return jsonify({"success": True, "week": week}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ── Get full week timetable (with subject details) ────────────────────────────
-@app.route("/api/timetable/week-details/<int:user_id>", methods=["GET"])
-def timetable_week_details(user_id):
+@app.route("/api/timetable/week-details", methods=["GET"])
+@require_auth
+def timetable_week_details():
     try:
-        week = get_timetable_week_with_details(user_id)
+        week = get_timetable_week_with_details(g.user_id)
         return jsonify({"success": True, "week": week}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ── Get today's schedule ──────────────────────────────────────────────────────
-@app.route("/api/attendance/today/<int:user_id>", methods=["GET"])
-def todays_schedule(user_id):
+@app.route("/api/attendance/today", methods=["GET"])
+@require_auth
+def todays_schedule():
     try:
-        today = get_todays_schedule(user_id)
+        today = get_todays_schedule(g.user_id)
         return jsonify({"success": True, "data": today}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -472,13 +479,12 @@ def todays_schedule(user_id):
 
 # ── Mark attendance ───────────────────────────────────────────────────────────
 @app.route("/api/attendance/mark", methods=["POST"])
+@require_auth
 def mark_student_attendance():
-    data = request.get_json()
-    user_id = data.get("user_id")
+    data = request.get_json() or {}
+    user_id = g.user_id
     records = data.get("records", [])
 
-    if not user_id:
-        return jsonify({"success": False, "error": "user_id is required"}), 400
     if not records:
         return jsonify({"success": False, "error": "No records provided"}), 400
 
@@ -496,25 +502,25 @@ def mark_student_attendance():
 
 # ── Update a single timetable slot ───────────────────────────────────────────
 @app.route("/api/timetable/update-slot", methods=["PUT"])
+@require_auth
 def update_timetable_slot():
     """
     Auto-saves a single cell change in the timetable.
     {
-      "user_id": 1,
       "day": "Monday",
       "slot_key": "s1",
       "subject_id": 3   ← null means empty/no class
     }
     """
-    data = request.get_json()
-    user_id = data.get("user_id")
+    data = request.get_json() or {}
+    user_id = g.user_id
     day = data.get("day")
     slot_key = data.get("slot_key")
     subject_id = data.get("subject_id")  # null = no class
 
-    if not all([user_id, day, slot_key]):
+    if not all([day, slot_key]):
         return (
-            jsonify({"success": False, "error": "user_id, day, slot_key required"}),
+            jsonify({"success": False, "error": "day and slot_key required"}),
             400,
         )
 
@@ -589,10 +595,11 @@ def update_timetable_slot():
 
 
 # ── Attendance summary ────────────────────────────────────────────────────────
-@app.route("/api/attendance/summary/<int:user_id>", methods=["GET"])
-def attendance_summary(user_id):
+@app.route("/api/attendance/summary", methods=["GET"])
+@require_auth
+def attendance_summary():
     try:
-        summary = get_attendance_summary(user_id)
+        summary = get_attendance_summary(g.user_id)
         return jsonify({"success": True, "summary": summary}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

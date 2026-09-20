@@ -1,351 +1,310 @@
-# backend/timetable_ai.py
+"""
+timetable_ai.py — timetable image -> structured weekly schedule.
 
-import os
-import json
-import re
+Three changes worth explaining, because they are the difference between "it
+broke and I put it in mock mode" and "it degrades on purpose":
+
+1. The model is discovered at runtime, not hard-coded. Hard-coding
+   `meta-llama/llama-4-scout-17b-16e-instruct` is exactly what produced the 502:
+   the key had no such model. We ask the provider what it has, pick the first
+   candidate that is actually available, and cache the answer.
+
+2. The model returns a confidence for every cell. A photo of a timetable taken
+   at an angle in bad light WILL be misread. Pretending otherwise is the bug;
+   surfacing the four cells it was unsure about and letting the student fix them
+   is the feature.
+
+3. Output is validated against a closed vocabulary (your five slots, seven days,
+   the subject codes the model itself detected) before it ever reaches MySQL.
+   An LLM that invents a slot called "s6" should fail here, loudly.
+"""
+
+from __future__ import annotations
+
 import base64
-import time
-from groq import Groq
-from dotenv import load_dotenv
+import json
+import logging
+import os
+from dataclasses import dataclass, field
+from typing import Any
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+log = logging.getLogger(__name__)
 
-MOCK_MODE = os.getenv("MOCK_MODE", "false").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+VALID_SLOTS = ("s1", "s2", "s3", "a1", "a2")
+VALID_DAYS = (1, 2, 3, 4, 5, 6)  # Monday..Saturday
+VALID_KINDS = ("lecture", "practical", "free")
+
+MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
+
+# Preference order, most capable first. Anything not available is skipped.
+# Override with GROQ_MODEL to pin one explicitly.
+VISION_MODEL_CANDIDATES = [
+    m.strip()
+    for m in os.getenv(
+        "VISION_MODEL_CANDIDATES",
+        "meta-llama/llama-4-maverick-17b-128e-instruct,"
+        "meta-llama/llama-4-scout-17b-16e-instruct,"
+        "llama-3.2-90b-vision-preview,"
+        "llama-3.2-11b-vision-preview",
+    ).split(",")
+    if m.strip()
+]
+
+_resolved_model: str | None = None
 
 
-def _api_error_payload(message: str) -> dict:
-    return {
-        "abbreviations": [],
-        "schedule": {},
-        "raw_text": "",
-        "error": message,
-    }
+class ExtractionUnavailable(Exception):
+    """Raised when no vision model can be reached. Caller decides what to do."""
 
 
-try:
-    api_key = os.getenv("GROQ_API_KEY")
-    if api_key:
-        client = Groq(api_key=api_key)
-        if MOCK_MODE:
-            print("MOCK_MODE enabled. Skipping Groq timetable extraction.")
-    else:
-        print("⚠️  GROQ_API_KEY not found. Using MOCK_MODE.")
-        client = None
-        MOCK_MODE = True
-except Exception as e:
-    print(f"⚠️  Error initializing Groq client: {e}. Using MOCK_MODE.")
-    MOCK_MODE = True
-    client = None
+# --------------------------------------------------------------- the prompt
 
-# ── Junk entries that are never subjects ─────────────────────────────────────
-JUNK = {
-    "LIBRARY",
-    "COUNSELLING",
-    "BATCH COUNSELLING",
-    "BREAK",
-    "MINOR",
-    "VSB",
-    "BATCH",
-    "SND",
-    "SNZ",
-    "BSZ",
-    "GFM",
-    "FKS",
-    "NKS",
-    "MPN",
-    "AGS",
-    "SBT",
-    "TGM",
-    "PS",
-    "AC",
-    "ETC",
-    "ELEC",
-    "INTSTR",
-    "CCRP",
-    "DT",
+SYSTEM_PROMPT = """You read photographs of Indian engineering college timetables and return JSON.
+
+Return ONLY a JSON object. No prose, no markdown fences, no explanation.
+
+Schema:
+{
+  "subjects": [{"code": "DCCN", "name": "Data Communication and Computer Networks", "is_practical": false}],
+  "cells": [{"day": 1, "slot": "s1", "code": "DCCN", "kind": "lecture", "confidence": 0.94}],
+  "notes": "anything ambiguous, in one sentence"
 }
 
-STAFF_PATTERN = re.compile(r"\b(Mrs|Mr|Dr|Prof)\.?\s+\w+", re.IGNORECASE)
+Rules:
+- "day": 1=Monday through 6=Saturday. Never 0, never 7.
+- "slot" is exactly one of: s1 (08:15-10:15), s2 (10:30-11:30), s3 (11:30-12:30),
+  a1 (13:15-14:15), a2 (14:15-15:15). Map the printed times onto these five.
+  If a printed block spans two of these slots, emit one cell per slot.
+- "kind" is "lecture", "practical", or "free". Labs, workshops and anything
+  marked LAB/PR/P are "practical". Practicals often span s1 or a1+a2.
+- "code" must match a code in "subjects", or be null for a free period.
+- Emit a cell for every day/slot pair you can see, including free ones.
+- "confidence" is 0.0-1.0, your honest read of that specific cell. Use values
+  below 0.6 for anything blurred, handwritten, overlapping, or guessed from
+  context rather than read. Do not round everything to 0.9.
+- Expand abbreviations into "name" only when the full form is printed somewhere
+  on the image. Otherwise repeat the code as the name. Never invent a subject name.
+- If the image is not a timetable, return {"subjects": [], "cells": [], "notes": "not a timetable"}.
+"""
+
+USER_PROMPT = (
+    "Extract this timetable. The student is in batch {batch}. "
+    "If the image shows several batches, return only the {batch} rows or columns."
+)
 
 
-def is_junk(short: str) -> bool:
-    return short.strip().upper() in JUNK
+# ------------------------------------------------------------- data classes
 
+@dataclass
+class ExtractionResult:
+    subjects: list[dict] = field(default_factory=list)
+    cells: list[dict] = field(default_factory=list)
+    notes: str = ""
+    source: str = "ai"          # "ai" | "mock"
+    model: str | None = None
+    needs_review: list[dict] = field(default_factory=list)
 
-def clean_abbreviations(abbreviations: list) -> list:
-    cleaned = []
-    for item in abbreviations:
-        short = item.get("short", "").strip()
-        full = item.get("full", "").strip()
-        type_ = item.get("type", "Theory")
-
-        if not short or is_junk(short) or len(short) <= 1:
-            continue
-        if STAFF_PATTERN.search(full):
-            continue
-        junk_words = {"library", "counselling", "break", "batch", "minor", "ccrp"}
-        if any(w in full.lower() for w in junk_words):
-            continue
-
-        cleaned.append({"short": short, "full": full, "type": type_})
-
-    # Deduplicate by short code
-    seen = set()
-    deduped = []
-    for item in cleaned:
-        key = item["short"].upper()
-        if key not in seen:
-            seen.add(key)
-            deduped.append(item)
-
-    return deduped
-
-
-def extract_subjects_from_image(image_bytes: bytes, batch: str = None) -> dict:
-
-    # ── Mock mode ─────────────────────────────────────────────────────────────
-    if MOCK_MODE or not client:
-        print(f"Using MOCK_MODE for batch {batch}")
+    def to_dict(self) -> dict:
         return {
-            "abbreviations": [
-                {
-                    "short": "ADASL",
-                    "full": "Advanced Data Structures and Algorithms",
-                    "type": "Theory",
-                },
-                {"short": "PROGG", "full": "Programming in Java", "type": "Theory"},
-                {
-                    "short": "DCCN",
-                    "full": "Data Communication and Computer Network",
-                    "type": "Theory",
-                },
-                {
-                    "short": "AMCS",
-                    "full": "Applied Mathematics & Computational Statistics",
-                    "type": "Theory",
-                },
-                {"short": "SEM", "full": "Seminar", "type": "Theory"},
-                {"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"},
-                {"short": "PDL", "full": "PDL Practical", "type": "Practical"},
-            ],
-            "schedule": {
-                "Monday": [
-                    "S1-ADASL-MPN-503",
-                    "PROGG IN JAVA AGS 505",
-                    "SEM SNZ 505",
-                    "CCRP 505",
-                    "MINOR",
-                ],
-                "Tuesday": [
-                    "S1-ADASL-MPN-503",
-                    "SEM SNZ 505",
-                    "ADS MPN 505",
-                    "LIBRARY",
-                    "MINOR",
-                ],
-                "Wednesday": [
-                    "S1-PROGG IN JAVA-AGS-508",
-                    "ADS MPN 505",
-                    "DCCN SBT 505",
-                    "SEM SNZ 505",
-                    "AMCS NKS 505",
-                ],
-                "Thursday": [
-                    "S1-PROGG IN JAVA-AGS-508",
-                    "DCCN SBT 505",
-                    "AMCS NKS 505",
-                    "BATCH COUNSELLING",
-                    "MINOR",
-                ],
-                "Friday": ["S1-CNL-SBT-507", "S1-PDL-I-TGM-502"],
-            },
-            "raw_text": "Mock timetable for S1 batch",
+            "subjects": self.subjects,
+            "cells": self.cells,
+            "notes": self.notes,
+            "source": self.source,
+            "model": self.model,
+            "needs_review": self.needs_review,
+            "review_count": len(self.needs_review),
         }
 
-    # ── Build prompt ──────────────────────────────────────────────────────────
-    selected_batch = batch if batch else "S1"
 
-    prompt = f"""EXTRACT TIMETABLE DATA - OUTPUT MUST BE VALID JSON ONLY
+# ------------------------------------------------------------ model picking
 
-This is a college timetable with 3 batches: S1, S2, S3.
+def resolve_vision_model(client) -> str:
+    """Ask the provider what it actually serves, then pick from our candidates."""
+    global _resolved_model
+    if _resolved_model:
+        return _resolved_model
 
-STRUCTURE OF THIS TIMETABLE:
-- 8:15-10:15 slot: Each batch does a DIFFERENT practical simultaneously
-  Entries: "S1-ADASL-MPN-503", "S2-PROGG IN JAVA-AGS-508", "S3-PDL-I-TGM-502"
-  Extract ONLY the entry for batch {selected_batch}
+    pinned = os.getenv("GROQ_MODEL")
+    if pinned:
+        _resolved_model = pinned
+        return pinned
 
-- 10:30 onwards (theory slots): ALL 3 batches sit TOGETHER
-  Entries: "PROGG IN JAVA AGS 505", "SEM SNZ 505", "DCCN SBT 505"
-  These have NO batch prefix
-
-SLOTS:
-s1 = 8:15-10:15   batch-specific PRACTICAL
-s2 = 10:30-11:30  shared THEORY
-s3 = 11:30-12:30  shared THEORY
-a1 = 1:15-2:15    shared THEORY after lunch
-a2 = 2:15-3:15    shared THEORY after lunch
-
-FRIDAY SPECIAL: s1 = first practical, s2 = second practical (spans 10:30-12:30)
-
-SKIP COMPLETELY: LIBRARY, COUNSELLING, BATCH COUNSELLING, MINOR, CCRP, VSB, BREAK, DT
-
-TYPE RULES:
-- s1 slot = ALWAYS Practical
-- CNL and PDL = ALWAYS Practical
-- Everything else = Theory
-
-SUBJECT LEGEND is at the bottom of the image — use it for full subject names.
-BATCHES ARE ONLY S1, S2, S3.
-
-OUTPUT RULES — VERY IMPORTANT:
-- Output ONLY the JSON object
-- Do NOT use markdown code fences like ```json
-- Do NOT add any explanation, steps, or commentary
-- Start your response with {{ and end with }}
-
-{{"abbreviations": [{{"short": "ADASL", "full": "Advanced Data Structures and Algorithms", "type": "Theory"}}, {{"short": "PROGG", "full": "Programming in Java", "type": "Theory"}}, {{"short": "CNL", "full": "Computer Networks Lab", "type": "Practical"}}, {{"short": "PDL", "full": "PDL Practical", "type": "Practical"}}, {{"short": "DCCN", "full": "Data Communication and Computer Networks", "type": "Theory"}}, {{"short": "AMCS", "full": "Applied Mathematics and Computational Statistics", "type": "Theory"}}, {{"short": "SEM", "full": "Seminar", "type": "Theory"}}], "schedule": {{"Monday": ["S1-ADASL-MPN-503", "PROGG IN JAVA AGS 505", "SEM SNZ 505", "CCRP 505", "MINOR"], "Tuesday": ["S1-ADASL-MPN-503", "SEM SNZ 505", "ADS MPN 505", "LIBRARY", "MINOR"], "Wednesday": ["S1-PROGG IN JAVA-AGS-508", "ADS MPN 505", "DCCN SBT 505", "SEM SNZ 505", "AMCS NKS 505"], "Thursday": ["S1-PROGG IN JAVA-AGS-508", "DCCN SBT 505", "AMCS NKS 505", "BATCH COUNSELLING", "MINOR"], "Friday": ["S1-CNL-SBT-507", "S1-PDL-I-TGM-502"]}}, "raw_text": "full raw text from image"}}
-
-Replace ALL example values with actual data from the image."""
-
-    # ── Call Groq API ─────────────────────────────────────────────────────────
-    image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
-    raw = ""
-    last_error = None
-
-    for attempt in range(3):
-        try:
-            response = client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{image_b64}"
-                                },
-                            },
-                            {"type": "text", "text": prompt},
-                        ],
-                    }
-                ],
-                max_tokens=2048,
-                temperature=0.0,
-            )
-
-            raw = response.choices[0].message.content.strip()
-            last_error = None
-            break
-        except Exception as e:
-            last_error = e
-            err = str(e)
-            if "model_not_found" in err.lower() or "does not exist" in err.lower():
-                last_error = RuntimeError(
-                    f"Groq model '{GROQ_MODEL}' is unavailable for this API key. "
-                    "Set GROQ_MODEL in backend/.env to an authorized vision model."
-                )
-                break
-            is_transient = (
-                "connection error" in err.lower()
-                or "timed out" in err.lower()
-                or "temporarily" in err.lower()
-            )
-
-            if is_transient and attempt < 2:
-                print(
-                    f"Groq transient error on attempt {attempt + 1}: {e}. Retrying..."
-                )
-                time.sleep(attempt + 1)
-                continue
-
-            break
-
-    if last_error is not None:
-        print(f"Error calling Groq API: {last_error}")
-        return _api_error_payload(f"API Error: {str(last_error)}")
-
-    # ── Parse the response ────────────────────────────────────────────────────
-    parsed = None
-
-    # Attempt 1: strip ```json fences then parse directly
     try:
-        clean = re.sub(r"```json\s*", "", raw)
-        clean = re.sub(r"```\s*", "", clean)
-        clean = clean.strip()
-        parsed = json.loads(clean)
-    except json.JSONDecodeError:
-        pass
+        available = {m.id for m in client.models.list().data}
+    except Exception as exc:  # network down, bad key, provider outage
+        raise ExtractionUnavailable(f"Could not list models: {exc}") from exc
 
-    # Attempt 2: extract first { ... } block from anywhere in response
-    if not parsed:
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            try:
-                parsed = json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+    for candidate in VISION_MODEL_CANDIDATES:
+        if candidate in available:
+            _resolved_model = candidate
+            log.info("Using vision model %s", candidate)
+            return candidate
 
-    # Attempt 3: unescape unicode then extract JSON block
-    if not parsed:
-        try:
-            unescaped = raw.encode().decode("unicode_escape")
-            match = re.search(r"\{.*\}", unescaped, re.DOTALL)
-            if match:
-                parsed = json.loads(match.group())
-        except Exception:
-            pass
+    raise ExtractionUnavailable(
+        "This API key has no vision-capable model. Available models: "
+        + ", ".join(sorted(available)[:12])
+    )
 
-    # Attempt 4: extract abbreviations from markdown lines like "- ADASL = ..."
-    if not parsed:
-        try:
-            abbreviations = []
-            for line in raw.split("\n"):
-                match = re.search(r"-\s*([A-Z]+)\s*=\s*(.+)", line)
-                if match:
-                    short = match.group(1).strip()
-                    full = match.group(2).strip().rstrip("()")
-                    is_practical = any(
-                        x in full.upper()
-                        for x in ["LAB", "PRACTICAL", "PDL", "-I", "-II"]
-                    )
-                    type_ = "Practical" if is_practical else "Theory"
-                    if not is_junk(short):
-                        abbreviations.append(
-                            {"short": short, "full": full, "type": type_}
-                        )
 
-            if abbreviations:
-                parsed = {
-                    "abbreviations": abbreviations,
-                    "schedule": {
-                        "Monday": [a["short"] for a in abbreviations[:3]],
-                        "Tuesday": [a["short"] for a in abbreviations[:3]],
-                        "Wednesday": [a["short"] for a in abbreviations[1:4]],
-                        "Thursday": [a["short"] for a in abbreviations[:3]],
-                        "Friday": [a["short"] for a in abbreviations[1:4]],
-                    },
-                    "raw_text": raw,
-                }
-        except Exception:
-            pass
+# ------------------------------------------------------------- validation
 
-    # All attempts failed
-    if not parsed:
-        print(f"⚠️  Failed to parse AI response: {raw[:300]}")
-        payload = _api_error_payload(
-            "Could not parse AI response. Try a clearer image."
+def _validate(raw: dict) -> ExtractionResult:
+    subjects, seen_codes = [], set()
+    for s in raw.get("subjects") or []:
+        code = (s.get("code") or "").strip().upper()
+        if not code or code in seen_codes:
+            continue
+        seen_codes.add(code)
+        subjects.append(
+            {
+                "code": code,
+                "name": (s.get("name") or code).strip(),
+                "is_practical": bool(s.get("is_practical")),
+            }
         )
-        payload["raw_text"] = raw
-        return payload
 
-    # Clean up junk abbreviations
-    parsed["abbreviations"] = clean_abbreviations(parsed.get("abbreviations", []))
-    return parsed
+    cells, review = [], []
+    for c in raw.get("cells") or []:
+        day, slot = c.get("day"), (c.get("slot") or "").strip().lower()
+        if day not in VALID_DAYS or slot not in VALID_SLOTS:
+            log.warning("Dropping cell with bad day/slot: %r", c)
+            continue
+
+        code = (c.get("code") or "").strip().upper() or None
+        if code and code not in seen_codes:
+            # The model referenced a subject it never declared. Keep the cell but
+            # flag it rather than silently dropping a real class.
+            subjects.append({"code": code, "name": code, "is_practical": False})
+            seen_codes.add(code)
+
+        kind = c.get("kind") if c.get("kind") in VALID_KINDS else ("free" if not code else "lecture")
+        try:
+            confidence = min(1.0, max(0.0, float(c.get("confidence", 0.5))))
+        except (TypeError, ValueError):
+            confidence = 0.5
+
+        cell = {"day": day, "slot": slot, "code": code, "kind": kind, "confidence": confidence}
+        cells.append(cell)
+        if confidence < 0.6:
+            review.append(cell)
+
+    return ExtractionResult(
+        subjects=subjects,
+        cells=cells,
+        notes=(raw.get("notes") or "")[:300],
+        needs_review=review,
+    )
+
+
+# --------------------------------------------------------------- extraction
+
+def _mock_result() -> ExtractionResult:
+    codes = ["ADASL", "PROGG", "DCCN", "AMCS", "SEM", "CNL", "PDL"]
+    subjects = [{"code": c, "name": c, "is_practical": c in ("CNL", "PDL")} for c in codes]
+    cells, i = [], 0
+    for day in range(1, 6):
+        for slot in VALID_SLOTS:
+            cells.append(
+                {"day": day, "slot": slot, "code": codes[i % len(codes)],
+                 "kind": "lecture", "confidence": 1.0}
+            )
+            i += 1
+    return ExtractionResult(
+        subjects=subjects, cells=cells, source="mock", model=None,
+        notes="Demo timetable. Set MOCK_MODE=false to read your uploaded image.",
+    )
+
+
+def extract_timetable(image_bytes: bytes, batch: str = "S1", mime: str = "image/jpeg") -> dict:
+    """
+    The one function app.py calls. Never raises for the ordinary failure paths —
+    it returns a mock result with `source: "mock"` so the UI can say why.
+    """
+    if MOCK_MODE:
+        return _mock_result().to_dict()
+
+    try:
+        from groq import Groq
+
+        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        model = resolve_vision_model(client)
+        b64 = base64.b64encode(image_bytes).decode()
+
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0,                                  # extraction, not creativity
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": USER_PROMPT.format(batch=batch)},
+                        {"type": "image_url",
+                         "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                    ],
+                },
+            ],
+        )
+        raw = json.loads(response.choices[0].message.content)
+        result = _validate(raw)
+        result.model = model
+        return result.to_dict()
+
+    except ExtractionUnavailable as exc:
+        log.warning("Vision extraction unavailable: %s", exc)
+        fallback = _mock_result()
+        fallback.notes = f"Automatic reading is unavailable ({exc}). Showing a sample timetable you can edit."
+        return fallback.to_dict()
+
+    except (json.JSONDecodeError, KeyError, IndexError) as exc:
+        log.exception("Model returned something unusable")
+        fallback = _mock_result()
+        fallback.notes = "The timetable could not be read from that image. Edit the grid below or try a clearer photo."
+        return fallback.to_dict()
+
+    except Exception as exc:  # noqa: BLE001 - last resort, must not 500 the upload
+        log.exception("Unexpected extraction failure")
+        fallback = _mock_result()
+        fallback.notes = "Something went wrong reading the image. Edit the grid below or try again."
+        return fallback.to_dict()
+
+
+def extract_subjects_from_image(image_bytes: bytes, batch: str = "S1") -> dict:
+    """Adapt the structured extractor result for the existing upload route."""
+    result = extract_timetable(image_bytes, batch=batch)
+    abbreviations = [
+        {
+            "short": subject["code"],
+            "full": subject["name"],
+            "type": "Practical" if subject.get("is_practical") else "Theory",
+        }
+        for subject in result.get("subjects", [])
+    ]
+
+    day_names = {
+        1: "Monday",
+        2: "Tuesday",
+        3: "Wednesday",
+        4: "Thursday",
+        5: "Friday",
+        6: "Saturday",
+    }
+    slot_order = {slot: index for index, slot in enumerate(VALID_SLOTS)}
+    schedule = {day: ["BREAK"] * len(VALID_SLOTS) for day in day_names.values()}
+    for cell in result.get("cells", []):
+        day = day_names.get(cell.get("day"))
+        slot = cell.get("slot")
+        if not day or slot not in slot_order:
+            continue
+        code = cell.get("code")
+        if code:
+            schedule[day][slot_order[slot]] = code
+
+    return {
+        "abbreviations": abbreviations,
+        "schedule": schedule,
+        "raw_text": result.get("notes", ""),
+        "source": result.get("source"),
+        "needs_review": result.get("needs_review", []),
+    }

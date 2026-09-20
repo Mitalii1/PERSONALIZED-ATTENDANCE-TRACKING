@@ -1,13 +1,26 @@
-"""Exact attendance-planning calculations, independent of Flask and MySQL."""
+"""
+planner.py — attendance budget maths.
+
+Deliberately has zero Flask and zero database imports. Everything here is a pure
+function over integers, which means it is trivially unit-testable and impossible
+to break by changing the schema.
+
+All percentages are handled as exact Fractions internally. Floats look harmless
+until a student sitting at exactly 75.0% is told they are at 74.999% and panics.
+"""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, asdict
 from fractions import Fraction
-from math import ceil, floor
+from math import floor, ceil
 from typing import Optional
 
 DEFAULT_THRESHOLD_PERCENT = 75
+
+# Attendance rows with these statuses are NOT counted as classes held.
+# A class the lecturer cancelled should never damage a student's percentage.
+NON_HELD_STATUSES = ("cancelled", "holiday")
 
 
 def _threshold(percent: int | float) -> Fraction:
@@ -15,47 +28,58 @@ def _threshold(percent: int | float) -> Fraction:
 
 
 def percentage(attended: int, held: int) -> float:
+    """Plain attendance percentage, rounded to 2dp. 0 held classes -> 0.0."""
     if held <= 0:
         return 0.0
     return round(float(Fraction(attended, held) * 100), 2)
 
 
-def skips_available(
-    attended: int,
-    held: int,
-    threshold_percent: int | float = DEFAULT_THRESHOLD_PERCENT,
-) -> int:
-    threshold = _threshold(threshold_percent)
-    if threshold <= 0:
-        return 10**6
-    return max(0, floor(Fraction(attended) / threshold - held))
+def skips_available(attended: int, held: int, threshold_percent=DEFAULT_THRESHOLD_PERCENT) -> int:
+    """
+    How many of the *next* classes you can miss and still finish >= threshold.
+
+        (attended) / (held + k) >= p   =>   k <= attended/p - held
+    """
+    p = _threshold(threshold_percent)
+    if p <= 0:
+        return 10**6  # effectively unlimited
+    k = Fraction(attended) / p - held
+    return max(0, floor(k))
 
 
-def classes_to_recover(
-    attended: int,
-    held: int,
-    threshold_percent: int | float = DEFAULT_THRESHOLD_PERCENT,
-) -> int:
-    threshold = _threshold(threshold_percent)
-    if threshold >= 1:
-        return 0 if attended == held else -1
-    needed = (threshold * held - attended) / (1 - threshold)
-    return max(0, ceil(needed))
+def classes_to_recover(attended: int, held: int, threshold_percent=DEFAULT_THRESHOLD_PERCENT) -> int:
+    """
+    How many classes in a row you must attend to climb back to the threshold.
 
-
-def best_possible_percentage(attended: int, held: int, remaining: int) -> float:
-    return percentage(attended + remaining, held + remaining)
+        (attended + n) / (held + n) >= p   =>   n >= (p*held - attended) / (1 - p)
+    """
+    p = _threshold(threshold_percent)
+    if p >= 1:
+        return 0 if attended == held else -1  # -1 == impossible
+    n = (p * held - attended) / (1 - p)
+    return max(0, ceil(n))
 
 
 def term_skip_budget(
     attended: int,
     held: int,
     remaining: int,
-    threshold_percent: int | float = DEFAULT_THRESHOLD_PERCENT,
+    threshold_percent=DEFAULT_THRESHOLD_PERCENT,
 ) -> int:
-    threshold = _threshold(threshold_percent)
-    possible_misses = Fraction(attended + remaining) - threshold * (held + remaining)
-    return max(0, min(remaining, floor(possible_misses)))
+    """
+    The honest number. Given `remaining` classes still scheduled before the term
+    ends, how many of them may you miss and still land on the threshold?
+
+        (attended + remaining - k) / (held + remaining) >= p
+    """
+    p = _threshold(threshold_percent)
+    k = Fraction(attended + remaining) - p * (held + remaining)
+    return max(0, min(remaining, floor(k)))
+
+
+def best_possible_percentage(attended: int, held: int, remaining: int) -> float:
+    """Where you end up if you attend every single remaining class."""
+    return percentage(attended + remaining, held + remaining)
 
 
 def status_band(current: float, budget: int, reachable: bool) -> str:
@@ -90,18 +114,19 @@ class SubjectPlan:
         return asdict(self)
 
 
-def _message(status: str, code: str, budget: int, recover: int, best: float) -> str:
-    if status == "unrecoverable":
+def _message(plan_status: str, code: str, budget: int, recover: int, best: float) -> str:
+    """Interface copy lives next to the logic that decides which line applies."""
+    if plan_status == "unrecoverable":
         return (
             f"Even with a clean sheet from here, {code} tops out at {best}%. "
-            "Talk to the department about a condonation or a make-up option."
+            f"Talk to the department about a condonation or a make-up option."
         )
-    if status == "at_risk":
+    if plan_status == "at_risk":
         if recover <= 0:
             return f"{code} is right on the line. Miss one and you drop below."
-        return f"Attend the next {recover} {code} classes in a row to get back above the line."
-    if status == "tight":
-        return f"{budget} more {code} classes to spare for the whole term. Spend them carefully."
+        return f"Attend the next {recover} {code} class{'es' if recover != 1 else ''} in a row to get back above the line."
+    if plan_status == "tight":
+        return f"{budget} more {code} class{'es' if budget != 1 else ''} to spare for the whole term. Spend them carefully."
     return f"{budget} {code} classes to spare before the term ends."
 
 
@@ -120,7 +145,7 @@ def build_subject_plan(
     best = best_possible_percentage(attended, held, remaining)
     reachable = best >= threshold_percent
     recover = classes_to_recover(attended, held, threshold_percent)
-    status = status_band(current, budget, reachable)
+    band = status_band(current, budget, reachable)
 
     return SubjectPlan(
         subject_id=subject_id,
@@ -136,8 +161,8 @@ def build_subject_plan(
         classes_to_recover=recover,
         best_possible_percent=best,
         reachable=reachable,
-        status=status,
-        message=_message(status, code, budget, recover, best),
+        status=band,
+        message=_message(band, code, budget, recover, best),
     )
 
 
@@ -146,16 +171,18 @@ def simulate_skip(
     skip_count: int = 1,
     threshold_percent: Optional[int] = None,
 ) -> dict:
-    threshold = threshold_percent or plan.threshold_percent
+    """
+    'What happens if I bunk tomorrow?' — answers the question the student is
+    actually asking, without mutating anything.
+    """
+    p = threshold_percent or plan.threshold_percent
     held_after = plan.held + skip_count
+    after = percentage(plan.attended, held_after)
     return {
         "skip_count": skip_count,
-        "percent_after": percentage(plan.attended, held_after),
-        "drops_below": percentage(plan.attended, held_after) < threshold,
+        "percent_after": after,
+        "drops_below": after < p,
         "budget_after": term_skip_budget(
-            plan.attended,
-            held_after,
-            max(0, plan.remaining - skip_count),
-            threshold,
+            plan.attended, held_after, max(0, plan.remaining - skip_count), p
         ),
     }

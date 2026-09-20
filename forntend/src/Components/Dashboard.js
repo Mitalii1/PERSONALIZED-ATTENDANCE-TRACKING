@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { authenticatedFetch, getAuthToken } from "../api";
 import "./Dashboard.css";
 
 const BACKEND_URL =
@@ -41,7 +42,7 @@ const SIMULATED_DETECTED_SUBJECTS = [
 ];
 
 function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
-  const userId = currentUser?.id;
+  const isAuthenticated = Boolean(getAuthToken());
   const userName = currentUser?.name || "Student";
   const userInitial = userName.trim().charAt(0).toUpperCase() || "S";
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -115,12 +116,12 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
   }, [compactTables]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!isAuthenticated) {
       setIsLoadingTimetable(false);
       return;
     }
     setIsLoadingTimetable(true);
-    fetch(`${BACKEND_URL}/api/timetable/week-details/${userId}`)
+    authenticatedFetch(`${BACKEND_URL}/api/timetable/week-details`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.week && data.week.length > 0) {
@@ -138,48 +139,43 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
       })
       .catch((err) => console.error("Could not load timetable:", err))
       .finally(() => setIsLoadingTimetable(false));
-  }, [userId]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!userId) return;
-    fetch(`${BACKEND_URL}/api/subjects/${userId}`)
+    if (!isAuthenticated) return;
+    authenticatedFetch(`${BACKEND_URL}/api/subjects`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setSubjectsList(data.subjects);
       })
       .catch((err) => console.error("Could not load subjects:", err));
-  }, [userId]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!userId) return;
-    fetch(`${BACKEND_URL}/api/attendance/summary/${userId}`)
+    if (!isAuthenticated) return;
+    authenticatedFetch(`${BACKEND_URL}/api/attendance/summary`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setAttendanceSummary(data.summary);
       })
       .catch((err) => console.error("Could not load summary:", err));
-  }, [attendanceSaved, userId]);
+  }, [attendanceSaved, isAuthenticated]);
 
   const updateSlot = useCallback(
     async (day, slotKey, subjectId) => {
       const indicatorKey = `${day}_${slotKey}`;
-      if (!userId) {
+      if (!isAuthenticated) {
         setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
         return;
       }
       setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saving" }));
       try {
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${BACKEND_URL}/api/timetable/update-slot`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: userId,
-              day,
-              slot_key: slotKey,
-              subject_id: subjectId,
-            }),
+            body: JSON.stringify({ day, slot_key: slotKey, subject_id: subjectId }),
           },
         );
         const data = await response.json();
@@ -231,7 +227,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
         setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
       }
     },
-    [subjectsList, userId],
+    [subjectsList, isAuthenticated],
   );
 
   const subjects = useMemo(() => {
@@ -704,7 +700,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
 
   async function saveAttendanceToDatabase() {
     setSaveStatus("");
-    if (!userId) {
+    if (!isAuthenticated) {
       setSaveStatus("Your session is missing. Please login again.");
       setSaveStatusType("error");
       return;
@@ -740,10 +736,10 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
       return;
     }
     try {
-      const response = await fetch(`${BACKEND_URL}/api/attendance/mark`, {
+      const response = await authenticatedFetch(`${BACKEND_URL}/api/attendance/mark`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, records }),
+        body: JSON.stringify({ records }),
       });
       const data = await response.json();
       if (data.success) {
