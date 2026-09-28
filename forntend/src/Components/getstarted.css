@@ -46,7 +46,14 @@
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 120, 102, 0.05);
   background: rgba(15, 23, 42, 0.96);
   backdrop-filter: blur(26px);
+  animation: pat-card-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
   transition: background 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.pat-light .pat-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.45);
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(255, 120, 102, 0.08);
 }
 
 .pat-dark .pat-card {
@@ -213,8 +220,29 @@
   overflow-y: auto;
 }
 
+.pat-light .pat-right {
+  background: rgba(255, 255, 255, 0.76);
+}
+
 .pat-dark .pat-right {
   background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.12), transparent 55%);
+}
+
+@keyframes pat-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pat-card {
+    animation: none;
+  }
 }
 
 .pat-right-header {
