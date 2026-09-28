@@ -22,6 +22,7 @@ function App() {
     canReturnToDashboardFromTimetable,
     setCanReturnToDashboardFromTimetable,
   ] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     const handleUnauthorized = () => handleLogout();
@@ -35,6 +36,7 @@ function App() {
       return;
     }
     setAuthToken(session.token);
+    setIsDemoMode(false);
     setCurrentUser(session.user || { name: session.name || "Student" });
     setPage("dashboard");
   }
@@ -45,6 +47,7 @@ function App() {
       return;
     }
     setAuthToken(session.token);
+    setIsDemoMode(false);
     setCurrentUser(session.user || { name: session.name || "Student" });
     setCanReturnToDashboardFromTimetable(false);
     setPage("timetable");
@@ -55,12 +58,24 @@ function App() {
     setCurrentUser(null);
     setCanReturnToDashboardFromTimetable(false);
     setPage("auth");
+    setIsDemoMode(false);
+  }
+
+  function handleDemo() {
+    clearAuthToken();
+    setCurrentUser({ name: "Demo Student", email: "demo@example.com" });
+    setIsDemoMode(true);
+    setPage("dashboard");
   }
 
   return (
     <div className="App">
       {page === "auth" && (
-        <First onLogin={handleLogin} onRegistered={handleRegistered} />
+        <First
+          onLogin={handleLogin}
+          onRegistered={handleRegistered}
+          onDemo={handleDemo}
+        />
       )}
       {page === "timetable" && (
         <Second
@@ -73,6 +88,7 @@ function App() {
       {page === "dashboard" && (
         <Dashboard
           currentUser={currentUser}
+          demoMode={isDemoMode}
           onGoToTimetable={() => {
             setCanReturnToDashboardFromTimetable(true);
             setPage("timetable");

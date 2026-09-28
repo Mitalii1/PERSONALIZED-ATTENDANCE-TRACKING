@@ -1,3 +1,21 @@
+.dash-demo-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(20, 184, 166, 0.4);
+  border-radius: 999px;
+  color: #0f766e;
+  background: rgba(20, 184, 166, 0.1);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dash--demo .dash-topbar {
+  border-bottom-color: rgba(20, 184, 166, 0.24);
+}
 /* ── Fonts ─────────────────────────────────────────────────────────────────── */
 @import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap");
 

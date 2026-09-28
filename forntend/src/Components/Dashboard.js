@@ -41,8 +41,50 @@ const SIMULATED_DETECTED_SUBJECTS = [
   "PDL Practical",
 ];
 
-function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
-  const isAuthenticated = Boolean(getAuthToken());
+const DEMO_SUBJECTS = [
+  { id: 1, subject_name: "Advanced Data Structures", type: "Theory" },
+  { id: 2, subject_name: "Programming in Java", type: "Theory" },
+  { id: 3, subject_name: "Data Communication and Networks", type: "Theory" },
+  { id: 4, subject_name: "Applied Mathematics", type: "Theory" },
+  { id: 5, subject_name: "Computer Networks Lab", type: "Practical" },
+];
+
+const DEMO_TIMETABLE = [
+  { day: "Monday", s1: "Advanced Data Structures", s2: "Programming in Java", s3: "Data Communication and Networks", a1: "Applied Mathematics", a2: "" },
+  { day: "Tuesday", s1: "Computer Networks Lab", s2: "Advanced Data Structures", s3: "Programming in Java", a1: "", a2: "Applied Mathematics" },
+  { day: "Wednesday", s1: "Advanced Data Structures", s2: "Data Communication and Networks", s3: "", a1: "Programming in Java", a2: "" },
+  { day: "Thursday", s1: "Applied Mathematics", s2: "Programming in Java", s3: "Data Communication and Networks", a1: "Advanced Data Structures", a2: "" },
+  { day: "Friday", s1: "Computer Networks Lab", s2: "Data Communication and Networks", s3: "", a1: "Applied Mathematics", a2: "Programming in Java" },
+];
+
+const DEMO_DETAILED_TIMETABLE = DEMO_TIMETABLE.map((row) => ({
+  ...row,
+  ...Object.fromEntries(
+    ["s1", "s2", "s3", "a1", "a2"].map((slot) => [
+      slot,
+      row[slot]
+        ? {
+            subject_id: DEMO_SUBJECTS.find((subject) => subject.subject_name === row[slot])?.id || null,
+            subject_name: row[slot],
+            type: row[slot].includes("Lab") ? "Practical" : "Theory",
+            slot_key: slot,
+            time_slot: ATTENDANCE_SLOT_TIMES_DB[slot],
+          }
+        : null,
+    ]),
+  ),
+}));
+
+const DEMO_ATTENDANCE_SUMMARY = [
+  { id: 1, subject_name: "Advanced Data Structures", total_classes: 18, attended_classes: 16, percentage: 89 },
+  { id: 2, subject_name: "Programming in Java", total_classes: 16, attended_classes: 13, percentage: 81 },
+  { id: 3, subject_name: "Data Communication and Networks", total_classes: 15, attended_classes: 10, percentage: 67 },
+  { id: 4, subject_name: "Applied Mathematics", total_classes: 14, attended_classes: 12, percentage: 86 },
+  { id: 5, subject_name: "Computer Networks Lab", total_classes: 10, attended_classes: 7, percentage: 70 },
+];
+
+function Dashboard({ currentUser, onGoToTimetable, onLogout, demoMode = false }) {
+  const isAuthenticated = demoMode || Boolean(getAuthToken());
   const userName = currentUser?.name || "Student";
   const userInitial = userName.trim().charAt(0).toUpperCase() || "S";
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -116,6 +158,12 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
   }, [compactTables]);
 
   useEffect(() => {
+    if (demoMode) {
+      setTimetableDetailed(DEMO_DETAILED_TIMETABLE);
+      setTimetableWeek(DEMO_TIMETABLE);
+      setIsLoadingTimetable(false);
+      return;
+    }
     if (!isAuthenticated) {
       setIsLoadingTimetable(false);
       return;
@@ -139,9 +187,13 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
       })
       .catch((err) => console.error("Could not load timetable:", err))
       .finally(() => setIsLoadingTimetable(false));
-  }, [isAuthenticated]);
+  }, [demoMode, isAuthenticated]);
 
   useEffect(() => {
+    if (demoMode) {
+      setSubjectsList(DEMO_SUBJECTS);
+      return;
+    }
     if (!isAuthenticated) return;
     authenticatedFetch(`${BACKEND_URL}/api/subjects`)
       .then((res) => res.json())
@@ -149,9 +201,13 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
         if (data.success) setSubjectsList(data.subjects);
       })
       .catch((err) => console.error("Could not load subjects:", err));
-  }, [isAuthenticated]);
+  }, [demoMode, isAuthenticated]);
 
   useEffect(() => {
+    if (demoMode) {
+      setAttendanceSummary(DEMO_ATTENDANCE_SUMMARY);
+      return;
+    }
     if (!isAuthenticated) return;
     authenticatedFetch(`${BACKEND_URL}/api/attendance/summary`)
       .then((res) => res.json())
@@ -159,13 +215,17 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
         if (data.success) setAttendanceSummary(data.summary);
       })
       .catch((err) => console.error("Could not load summary:", err));
-  }, [attendanceSaved, isAuthenticated]);
+  }, [attendanceSaved, demoMode, isAuthenticated]);
 
   const updateSlot = useCallback(
     async (day, slotKey, subjectId) => {
       const indicatorKey = `${day}_${slotKey}`;
       if (!isAuthenticated) {
         setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
+        return;
+      }
+      if (demoMode) {
+        setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saved" }));
         return;
       }
       setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "saving" }));
@@ -227,7 +287,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
         setSlotSaveState((prev) => ({ ...prev, [indicatorKey]: "error" }));
       }
     },
-    [subjectsList, isAuthenticated],
+    [demoMode, subjectsList, isAuthenticated],
   );
 
   const subjects = useMemo(() => {
@@ -705,6 +765,11 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
       setSaveStatusType("error");
       return;
     }
+    if (demoMode) {
+      setSaveStatus("Demo preview: attendance changes are not saved.");
+      setSaveStatusType("success");
+      return;
+    }
     setIsSaving(true);
     const todayRow = timetableWeek.find((r) => r.day === dayLabel);
     if (!todayRow) {
@@ -825,7 +890,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
   );
 
   return (
-    <div className="dash">
+    <div className={`dash ${demoMode ? "dash--demo" : ""}`}>
       <div className={`dash-shell ${sidebarOpen ? "sidebar-open" : ""}`}>
         <aside className="dash-sidebar" aria-label="Dashboard sidebar">
           <div className="sidebar-title" aria-label="Sidebar logo">
@@ -1118,6 +1183,7 @@ function Dashboard({ currentUser, onGoToTimetable, onLogout }) {
               </h2>
             </div>
             <div className="dash-topbar-right">
+              {demoMode && <span className="dash-demo-badge">Demo preview</span>}
               <div className="dash-topbar-date">
                 <span>{dayLabel}</span>
                 <span>{dateLabel}</span>

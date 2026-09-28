@@ -1,10 +1,6 @@
 import os
 import re
 from dotenv import load_dotenv
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
-
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from auth import require_auth, issue_token, hash_password, verify_password
@@ -17,6 +13,9 @@ from attendance import (
     mark_attendance,
     get_attendance_summary,
 )
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 app = Flask(__name__)
 CORS(app)
@@ -112,8 +111,6 @@ def signup():
                 {
                     "success": True,
                     "message": "Account created successfully!",
-                    "token": issue_token(user_id, email),
-                    "name": name,
                     "user": {
                         "id": user_id,
                         "name": name,
@@ -165,7 +162,6 @@ def login():
                     "success": True,
                     "message": "Login successful",
                     "token": issue_token(user["id"], user["email"]),
-                    "name": user["name"],
                     "user": {
                         "id": user["id"],
                         "name": user["name"],
@@ -304,7 +300,7 @@ def parse_abbreviation(entry: str) -> str:
 @app.route("/api/timetable/save-subjects", methods=["POST"])
 @require_auth
 def save_subjects():
-    data = request.get_json() or {}
+    data = request.get_json()
     user_id = g.user_id
     subjects = data.get("subjects", [])
     schedule = data.get("schedule", {})
@@ -481,10 +477,9 @@ def todays_schedule():
 @app.route("/api/attendance/mark", methods=["POST"])
 @require_auth
 def mark_student_attendance():
-    data = request.get_json() or {}
+    data = request.get_json()
     user_id = g.user_id
     records = data.get("records", [])
-
     if not records:
         return jsonify({"success": False, "error": "No records provided"}), 400
 
@@ -512,7 +507,7 @@ def update_timetable_slot():
       "subject_id": 3   ← null means empty/no class
     }
     """
-    data = request.get_json() or {}
+    data = request.get_json()
     user_id = g.user_id
     day = data.get("day")
     slot_key = data.get("slot_key")

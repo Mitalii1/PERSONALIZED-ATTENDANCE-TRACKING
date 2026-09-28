@@ -4,7 +4,7 @@ import "./getstarted.css";
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
-function Getstarted({ onLogin, onRegistered }) {
+function Getstarted({ onLogin, onRegistered, onDemo }) {
   const [mode, setMode] = useState("login"); // 'login' | 'register'
   const [theme, setTheme] = useState(
     () => localStorage.getItem("pat-theme") || "light",
@@ -529,6 +529,15 @@ function Getstarted({ onLogin, onRegistered }) {
                 G
               </span>
               <span>Continue with Google</span>
+            </button>
+
+            <button
+              type="button"
+              className="pat-demo-btn"
+              onClick={onDemo}
+            >
+              Preview demo dashboard
+              <span aria-hidden="true">↗</span>
             </button>
 
             <p className="pat-footer">
