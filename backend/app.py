@@ -3,6 +3,10 @@ import re
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 from auth import require_auth, issue_token, hash_password, verify_password
 from timetable_ai import extract_subjects_from_image
 from db import get_connection
@@ -14,9 +18,6 @@ from attendance import (
     get_attendance_summary,
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
-
 app = Flask(__name__)
 CORS(app)
 
@@ -24,8 +25,7 @@ CORS(app)
 def ensure_users_table():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(120) NOT NULL,
@@ -34,8 +34,7 @@ def ensure_users_table():
             year VARCHAR(20) NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    """
-    )
+    """)
     conn.commit()
     cursor.close()
     conn.close()
