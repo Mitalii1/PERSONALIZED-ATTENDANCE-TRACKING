@@ -11,6 +11,10 @@ This project is a full-stack web app with:
 - MySQL as the persistent data store
 - Groq Vision integration for timetable extraction from images
 
+## Live Demo
+
+[Open the live application](https://personalized-attendance-tracking.vercel.app/)
+
 ## Key Features
 
 - Secure signup/login with password hashing (Werkzeug)
