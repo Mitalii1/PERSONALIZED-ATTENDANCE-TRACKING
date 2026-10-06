@@ -7,7 +7,7 @@ const BACKEND_URL =
 function Getstarted({ onLogin, onRegistered, onDemo }) {
   const [mode, setMode] = useState("login"); // 'login' | 'register'
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("pat-theme") || "light",
+    () => localStorage.getItem("pat-theme") || "dark",
   ); // 'light' | 'dark'
 
   const [values, setValues] = useState({
@@ -249,10 +249,13 @@ function Getstarted({ onLogin, onRegistered, onDemo }) {
         <section className="pat-left" aria-label="Project introduction">
           <div className="pat-badge">
             <span className="pat-badge-dot" aria-hidden="true" />
-            <span>Personal Attendance Tracking</span>
+            <span>Smarter attendance. Better insights.</span>
           </div>
 
-          <h1 className="pat-title">Personal Attendance Tracking System</h1>
+          <h1 className="pat-title">
+            Personal Attendance
+            <span>Tracking System</span>
+          </h1>
           <p className="pat-tagline">
             A clean, student-friendly way to manage daily attendance.
           </p>

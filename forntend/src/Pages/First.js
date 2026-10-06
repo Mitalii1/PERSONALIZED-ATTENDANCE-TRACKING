@@ -1,17 +1,11 @@
 import '../App.css';
-import Getstarted from '../Components/Getstarted';
+import Landing from "../Components/Landing";
 import React from 'react';
 
-function First({ onLogin, onRegistered, onDemo }) {
+function First({ onDemo }) {
   return (
     <>
-      <div className="first">
-        <Getstarted
-          onLogin={onLogin}
-          onRegistered={onRegistered}
-          onDemo={onDemo}
-        />
-      </div>
+      <Landing onDemo={onDemo} />
     </>
   );
 }
